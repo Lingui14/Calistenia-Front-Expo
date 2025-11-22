@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
+import { Ionicons } from '@expo/vector-icons';
 import { login, register } from './src/api/auth';
 import { getProfile } from './src/api/profile';
 import { getActiveRoutine, generateRoutine } from './src/api/routines';
@@ -38,12 +38,30 @@ function AuthScreen({ onLogin, onRegister }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loadingAuth, setLoadingAuth] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSubmit() {
     if (!email || !password) {
       Alert.alert('Campos vacíos', 'Escribe tu correo y contraseña');
       return;
+    }
+
+    if (mode === 'register') {
+      if (!confirmPassword) {
+        Alert.alert('Confirma tu contraseña', 'Escribe tu contraseña nuevamente');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Las contraseñas no coinciden', 'Verifica que ambas contraseñas sean iguales');
+        return;
+      }
+      if (password.length < 6) {
+        Alert.alert('Contraseña muy corta', 'La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
     }
 
     try {
@@ -66,65 +84,159 @@ function AuthScreen({ onLogin, onRegister }) {
     }
   }
 
+  function switchMode() {
+    setMode(mode === 'login' ? 'register' : 'login');
+    setPassword('');
+    setConfirmPassword('');
+  }
+
   return (
     <SafeAreaView style={styles.authContainer}>
-      <View style={styles.authCard}>
-        <Text style={styles.appTitle}>CalistenIA 🤖💪</Text>
-        <Text style={styles.appSubtitle}>
-          Tu coach de calistenia personalizada
-        </Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.authScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header spacer */}
+          <View style={styles.topSpacer} />
 
-        <View style={{ marginTop: 24 }}>
-          <Text style={styles.label}>Correo</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="tucorreo@email.com"
-            placeholderTextColor="#6b7280"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={email}
-            onChangeText={setEmail}
-          />
+          {/* Branding - Centrado arriba */}
+          <View style={styles.brandingSection}>
+            <View style={styles.logoContainer}>
+              <Ionicons name="barbell-outline" size={48} color="#ffffff" />
+            </View>
+            <Text style={styles.appTitle}>CalistenIA</Text>
+            <Text style={styles.appSubtitle}>Tu coach personal de calistenia</Text>
+          </View>
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Contraseña</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor="#6b7280"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleSubmit}
-            disabled={loadingAuth}
-          >
-            {loadingAuth ? (
-              <ActivityIndicator color="#022c22" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
+          {/* Form - Más abajo */}
+          <View style={styles.formSection}>
+            <View style={styles.authCard}>
+              <Text style={styles.formTitle}>
                 {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
               </Text>
-            )}
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
-          >
-            <Text style={styles.switchText}>
-              {mode === 'login'
-                ? '¿No tienes cuenta? Regístrate'
-                : '¿Ya tienes cuenta? Inicia sesión'}
+              {/* Email */}
+              <View style={styles.inputContainer}>
+                <Ionicons name="mail-outline" size={20} color="#737373" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Correo electrónico"
+                  placeholderTextColor="#525252"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
+
+              {/* Password */}
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={20} color="#737373" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Contraseña"
+                  placeholderTextColor="#525252"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons 
+                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                    size={20} 
+                    color="#737373" 
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Confirm Password - Solo en registro */}
+              {mode === 'register' && (
+                <View style={styles.inputContainer}>
+                  <Ionicons name="lock-closed-outline" size={20} color="#737373" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="Confirmar contraseña"
+                    placeholderTextColor="#525252"
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                    <Ionicons 
+                      name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
+                      size={20} 
+                      color="#737373" 
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Indicador de coincidencia */}
+              {mode === 'register' && confirmPassword.length > 0 && (
+                <View style={styles.passwordMatch}>
+                  <Ionicons 
+                    name={password === confirmPassword ? "checkmark-circle" : "close-circle"} 
+                    size={16} 
+                    color={password === confirmPassword ? "#22c55e" : "#dc2626"} 
+                  />
+                  <Text style={[
+                    styles.passwordMatchText,
+                    { color: password === confirmPassword ? "#22c55e" : "#dc2626" }
+                  ]}>
+                    {password === confirmPassword ? "Las contraseñas coinciden" : "Las contraseñas no coinciden"}
+                  </Text>
+                </View>
+              )}
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[styles.primaryButton, { marginTop: mode === 'register' ? 8 : 16 }]}
+                onPress={handleSubmit}
+                disabled={loadingAuth}
+              >
+                {loadingAuth ? (
+                  <ActivityIndicator color="#000000" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {mode === 'login' ? 'Entrar' : 'Registrarme'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>o</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Switch Mode */}
+              <TouchableOpacity
+                style={styles.secondaryButtonFull}
+                onPress={switchMode}
+              >
+                <Text style={styles.secondaryButtonFullText}>
+                  {mode === 'login' ? 'Crear cuenta nueva' : 'Ya tengo cuenta'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.bottomSection}>
+            <Text style={styles.footerText}>
+              Entrena inteligente, progresa constante
             </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
 /* ---------------------- RUTINA SCREEN ---------------------- */
 
 function RutinaScreen({
@@ -470,7 +582,7 @@ export default function App() {
   if (loadingInit) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#22c55e" />
+        <ActivityIndicator size="large" color="#ffffff" />
         <Text style={styles.loadingText}>Cargando CalistenIA...</Text>
       </SafeAreaView>
     );
@@ -511,8 +623,8 @@ export default function App() {
           options={{ 
             headerShown: true, 
             title: 'Entrenamiento', 
-            headerStyle: { backgroundColor: '#020617' }, 
-            headerTintColor: '#22c55e' 
+            headerStyle: { backgroundColor: '#000000' }, 
+            headerTintColor: '#ffffff' 
           }}
         />
       </Stack.Navigator>
@@ -523,18 +635,24 @@ export default function App() {
   return (
     <NavigationContainer>
       <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: { 
-            backgroundColor: '#020617', 
-            borderTopColor: '#111827',
-            paddingBottom: 4,
-            paddingTop: 4,
-          },
-          tabBarActiveTintColor: '#22c55e',
-          tabBarInactiveTintColor: '#9ca3af',
-        }}
-      >
+  screenOptions={({ route }) => ({
+    headerShown: false,
+    tabBarIcon: ({ focused, color, size }) => {
+      let iconName;
+      
+      if (route.name === 'Rutina') iconName = focused ? 'today' : 'today-outline';
+      else if (route.name === 'MisRutinas') iconName = focused ? 'barbell' : 'barbell-outline';
+      else if (route.name === 'Progreso') iconName = focused ? 'stats-chart' : 'stats-chart-outline';
+      else if (route.name === 'Chat') iconName = focused ? 'chatbubble' : 'chatbubble-outline';
+      else if (route.name === 'Comida') iconName = focused ? 'restaurant' : 'restaurant-outline';
+      
+      return <Ionicons name={iconName} size={size} color={color} />;
+    },
+    tabBarActiveTintColor: '#ffffff',
+    tabBarInactiveTintColor: '#737373',
+    tabBarStyle: { backgroundColor: '#000000', borderTopColor: '#262626' },
+  })}
+>
         <Tab.Screen 
           name="Rutina" 
           component={RutinaStack}
@@ -568,71 +686,150 @@ export default function App() {
 /* ---------------------- STYLES ---------------------- */
 
 const styles = StyleSheet.create({
+  // Auth Screen
   authContainer: {
     flex: 1,
-    backgroundColor: '#020617',
-    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+  authScrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
   },
-  authCard: {
-    backgroundColor: '#020617',
-    padding: 20,
-    borderRadius: 20,
+  topSpacer: {
+    height: 60,
+  },
+  brandingSection: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  logoContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#171717',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
   },
   appTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#e5e7eb',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
   },
   appSubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#737373',
     marginTop: 4,
   },
-  label: {
-    fontSize: 13,
-    color: '#9ca3af',
-    marginBottom: 4,
+  formSection: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
-  input: {
-    backgroundColor: '#020617',
+  authCard: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 20,
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#171717',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#e5e7eb',
-    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#262626',
+    marginBottom: 16,
+    paddingHorizontal: 14,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  inputField: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#ffffff',
+  },
+  passwordMatch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: -8,
+  },
+  passwordMatchText: {
+    fontSize: 12,
+    marginLeft: 6,
   },
   primaryButton: {
-    marginTop: 20,
-    backgroundColor: '#22c55e',
-    paddingVertical: 12,
-    borderRadius: 999,
+    marginTop: 16,
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#022c22',
-    fontSize: 15,
+    color: '#000000',
+    fontSize: 16,
     fontWeight: '700',
   },
-  switchText: {
-    marginTop: 16,
-    color: '#9ca3af',
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#262626',
+  },
+  dividerText: {
+    color: '#525252',
+    paddingHorizontal: 16,
+    fontSize: 13,
+  },
+  secondaryButtonFull: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#404040',
+  },
+  secondaryButtonFullText: {
+    color: '#a3a3a3',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  bottomSection: {
+    paddingVertical: 24,
+  },
+  footerText: {
+    color: '#525252',
     fontSize: 13,
     textAlign: 'center',
   },
+
+  // Screen containers
   screenContainer: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
     paddingHorizontal: 16,
     paddingTop: 16,
   },
   screenContainerCenter: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
     paddingHorizontal: 16,
     paddingTop: 16,
     justifyContent: 'center',
@@ -641,101 +838,103 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
     textAlign: 'center',
   },
   screenSubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 8,
     textAlign: 'center',
   },
-  placeholderEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
+
+  // Buttons
   secondaryButton: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#4b5563',
+    borderColor: '#404040',
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#e5e7eb',
+    color: '#ffffff',
     fontSize: 13,
   },
   primaryButtonInline: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     alignItems: 'center',
   },
   primaryButtonTextInline: {
-    color: '#022c22',
+    color: '#000000',
     fontSize: 13,
     fontWeight: '700',
   },
+
+  // Routine Card
   routineCard: {
     marginTop: 24,
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1f2937',
-    backgroundColor: '#020617',
+    borderColor: '#262626',
+    backgroundColor: '#0a0a0a',
   },
   routineTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   routineDescription: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
   },
   routineTag: {
     fontSize: 12,
-    color: '#bbf7d0',
+    color: '#d4d4d4',
     marginTop: 6,
   },
   sectionHeading: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   exerciseRow: {
     marginTop: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#111827',
+    borderBottomColor: '#262626',
   },
   exerciseName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   exerciseDetail: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 2,
   },
   startTrainingButton: {
     marginTop: 20,
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     paddingVertical: 14,
     borderRadius: 999,
     alignItems: 'center',
   },
   startTrainingButtonText: {
-    color: '#022c22',
+    color: '#000000',
     fontSize: 15,
     fontWeight: '700',
   },
+
+  // Empty & misc
   emptyText: {
-    color: '#6b7280',
+    color: '#737373',
     fontSize: 13,
   },
   logoutButton: {
@@ -745,20 +944,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: '#dc2626',
   },
   logoutButtonText: {
-    color: '#ef4444',
+    color: '#dc2626',
     fontSize: 13,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 12,
   },
 });
@@ -766,21 +965,21 @@ const styles = StyleSheet.create({
 export const chatStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   header: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: '#262626',
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   subtitle: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#737373',
     marginTop: 2,
   },
   messagesContainer: {
@@ -801,7 +1000,7 @@ export const chatStyles = StyleSheet.create({
   },
   emptyChatText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     textAlign: 'center',
     lineHeight: 22,
     paddingHorizontal: 20,
@@ -811,16 +1010,16 @@ export const chatStyles = StyleSheet.create({
     width: '100%',
   },
   suggestionChip: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#171717',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#262626',
   },
   suggestionText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 13,
     textAlign: 'center',
   },
@@ -832,45 +1031,45 @@ export const chatStyles = StyleSheet.create({
   },
   userBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
   },
   aiBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1f2937',
+    backgroundColor: '#171717',
   },
   messageText: {
     fontSize: 14,
     lineHeight: 20,
   },
   userText: {
-    color: '#022c22',
+    color: '#000000',
   },
   aiText: {
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: '#1f2937',
+    borderTopColor: '#262626',
     alignItems: 'flex-end',
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   input: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#171717',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    color: '#e5e7eb',
+    color: '#ffffff',
     fontSize: 14,
     maxHeight: 100,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
   },
   sendButton: {
     marginLeft: 8,
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -878,10 +1077,10 @@ export const chatStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#262626',
   },
   sendButtonText: {
     fontSize: 18,
-    color: '#022c22',
+    color: '#000000',
   },
 });

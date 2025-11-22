@@ -552,7 +552,7 @@ export default function FoodScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   scrollContent: {
     padding: 16,
@@ -564,33 +564,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 12,
     fontSize: 14,
   },
   screenTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   screenSubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
     marginBottom: 24,
   },
   summaryCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     marginBottom: 16,
   },
   summaryTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginBottom: 12,
   },
   summaryRow: {
@@ -605,20 +605,18 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#22c55e',
+    color: '#ffffff',
   },
   summaryLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: '#737373',
     marginTop: 2,
   },
   summaryDivider: {
     width: 1,
     height: 30,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#262626',
   },
-
-  // Botones de acción
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -626,43 +624,43 @@ const styles = StyleSheet.create({
   },
   scanButton: {
     flex: 1,
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   scanButtonText: {
-    color: '#022c22',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '700',
   },
   galleryButton: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#171717',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     width: 56,
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   galleryButtonText: {
     fontSize: 20,
   },
   addButton: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#171717',
     padding: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#262626',
   },
   addButtonText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 14,
     fontWeight: '600',
   },
-
-  // Lista de comidas
   emptyState: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -674,20 +672,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#737373',
     textAlign: 'center',
   },
   foodCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     marginBottom: 10,
   },
   foodHeader: {
@@ -697,17 +695,17 @@ const styles = StyleSheet.create({
   },
   foodMeal: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#a3a3a3',
   },
   foodCalories: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#22c55e',
+    color: '#ffffff',
   },
   foodName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginTop: 6,
   },
   foodMacros: {
@@ -717,19 +715,17 @@ const styles = StyleSheet.create({
   },
   foodMacro: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#737373',
   },
   hint: {
     fontSize: 12,
-    color: '#4b5563',
+    color: '#525252',
     textAlign: 'center',
     marginTop: 16,
   },
-
-  // Modal escaneo
   scanModalContainer: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   scanModalHeader: {
     flexDirection: 'row',
@@ -737,12 +733,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: '#262626',
   },
   scanModalTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   scanModalContent: {
     padding: 16,
@@ -758,19 +754,17 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   analyzingText: {
-    color: '#22c55e',
+    color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
   },
   analyzingSubtext: {
-    color: '#6b7280',
+    color: '#737373',
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
   },
-
-  // Resultado
   resultContainer: {
     paddingTop: 8,
   },
@@ -780,7 +774,7 @@ const styles = StyleSheet.create({
   resultName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 8,
   },
   confidenceBadge: {
@@ -790,16 +784,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   confidenceHigh: {
-    backgroundColor: '#166534',
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#404040',
   },
   confidenceMedium: {
-    backgroundColor: '#854d0e',
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#404040',
   },
   confidenceLow: {
-    backgroundColor: '#7f1d1d',
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#404040',
   },
   confidenceText: {
-    color: '#fff',
+    color: '#d4d4d4',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -812,27 +812,27 @@ const styles = StyleSheet.create({
   nutrientCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
   },
   nutrientValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#22c55e',
+    color: '#ffffff',
   },
   nutrientLabel: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
   },
   resultNotes: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 14,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 12,
     borderRadius: 8,
     marginBottom: 20,
@@ -840,38 +840,38 @@ const styles = StyleSheet.create({
   mealTypeLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 12,
   },
   confirmButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
   },
   confirmButtonText: {
-    color: '#022c22',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '700',
   },
   retryButton: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#171717',
     padding: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   retryButtonText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 14,
     fontWeight: '600',
   },
-
-  // Modal manual
   modalContainer: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   modalContent: {
     padding: 16,
@@ -885,14 +885,14 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   cancelButton: {
-    color: '#ef4444',
+    color: '#dc2626',
     fontSize: 16,
   },
   saveButton: {
-    color: '#22c55e',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -902,18 +902,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 8,
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     borderRadius: 12,
     padding: 14,
-    color: '#e5e7eb',
+    color: '#ffffff',
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
   },
   mealTypeRow: {
     flexDirection: 'row',
@@ -924,14 +924,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   mealTypeButtonActive: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
+    borderColor: '#ffffff',
   },
   mealTypeText: {
     fontSize: 13,
-    color: '#e5e7eb',
+    color: '#a3a3a3',
   },
   macrosRow: {
     flexDirection: 'row',
@@ -942,17 +945,17 @@ const styles = StyleSheet.create({
   },
   macroLabel: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginBottom: 6,
   },
   macroInput: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     borderRadius: 10,
     padding: 12,
-    color: '#e5e7eb',
+    color: '#ffffff',
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     textAlign: 'center',
   },
 });

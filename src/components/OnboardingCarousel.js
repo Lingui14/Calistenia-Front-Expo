@@ -58,36 +58,30 @@ export default function OnboardingCarousel({ onDone }) {
   }
 
   async function handleFinish() {
-  try {
-    const payload = {
-      experience: profile.experience,
-      goal: profile.goal,
-      days_per_week: profile.daysPerWeek,
-      session_duration: profile.sessionDuration,
-      equipment: profile.equipment,
-      skills: profile.skills,
-      preferences: profile.preferences,
-      injuries: profile.injuries,
-      injuries_detail: profile.injuriesDetail,
-    };
+    try {
+      const payload = {
+        experience: profile.experience,
+        goal: profile.goal,
+        days_per_week: profile.daysPerWeek,
+        session_duration: profile.sessionDuration,
+        equipment: profile.equipment,
+        skills: profile.skills,
+        preferences: profile.preferences,
+        injuries: profile.injuries,
+        injuries_detail: profile.injuriesDetail,
+      };
 
-    await saveOnboardingProfile(payload);
+      await saveOnboardingProfile(payload);
 
-    // ✅ Ya NO guardamos la bandera aquí, lo hace App.js
-    // await AsyncStorage.setItem('onboardingDone', '1');
-
-    // ✅ Ya NO mostramos el Alert aquí
-    // Alert.alert('Listo', 'Tu perfil se guardó correctamente 🙌');
-
-    if (onDone) onDone(); // ← Esto llama a handleOnboardingDone en App.js
-  } catch (err) {
-    console.error(err);
-    Alert.alert(
-      'Error',
-      'No se pudo guardar tu perfil, intenta más tarde.'
-    );
+      if (onDone) onDone();
+    } catch (err) {
+      console.error(err);
+      Alert.alert(
+        'Error',
+        'No se pudo guardar tu perfil, intenta más tarde.'
+      );
+    }
   }
-}
 
   function validateStep() {
     switch (step) {
@@ -163,7 +157,7 @@ export default function OnboardingCarousel({ onDone }) {
       case 0:
         return (
           <View style={styles.center}>
-            <Text style={styles.title}>Bienvenido a CalistenIA 🤖💪</Text>
+            <Text style={styles.title}>Bienvenido a CalistenIA</Text>
             <Text style={styles.subtitle}>
               Te voy a ayudar a crear una rutina personalizada de calistenia
               basada en tu experiencia, objetivos y equipo disponible.
@@ -478,7 +472,7 @@ export default function OnboardingCarousel({ onDone }) {
             })}
 
             <Text style={[styles.subtitle, { marginTop: 16 }]}>
-              Con esto ajustaré tus ejercicios para evitar molestias 🙌
+              Con esto ajustaré tus ejercicios para evitar molestias
             </Text>
           </View>
         );
@@ -537,7 +531,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 48,
     paddingHorizontal: 20,
-    backgroundColor: '#0b1120',
+    backgroundColor: '#000000',
   },
   scroll: {
     paddingBottom: 40,
@@ -551,32 +545,32 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
   },
   option: {
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginTop: 12,
-    backgroundColor: '#020617',
+    backgroundColor: '#0a0a0a',
   },
   optionSelected: {
-    borderColor: '#22c55e',
-    backgroundColor: '#022c22',
+    borderColor: '#ffffff',
+    backgroundColor: '#171717',
   },
   optionText: {
-    color: '#e5e7eb',
+    color: '#a3a3a3',
     fontSize: 15,
   },
   optionTextSelected: {
-    color: '#bbf7d0',
+    color: '#ffffff',
     fontWeight: '600',
   },
   row: {
@@ -586,7 +580,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -594,15 +588,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   chipSelected: {
-    borderColor: '#22c55e',
-    backgroundColor: '#022c22',
+    borderColor: '#ffffff',
+    backgroundColor: '#171717',
   },
   chipText: {
-    color: '#e5e7eb',
+    color: '#a3a3a3',
     fontSize: 13,
   },
   chipTextSelected: {
-    color: '#bbf7d0',
+    color: '#ffffff',
     fontWeight: '600',
   },
   dotsContainer: {
@@ -614,11 +608,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#262626',
     marginHorizontal: 4,
   },
   dotActive: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     width: 16,
   },
   footer: {
@@ -631,26 +625,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#4b5563',
+    borderColor: '#404040',
   },
   navButtonDisabled: {
-    borderColor: '#374151',
+    borderColor: '#262626',
   },
   navButtonText: {
-    color: '#e5e7eb',
+    color: '#ffffff',
     fontSize: 14,
   },
   navButtonTextDisabled: {
-    color: '#6b7280',
+    color: '#525252',
   },
   navButtonPrimary: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
   },
   navButtonPrimaryText: {
-    color: '#022c22',
+    color: '#000000',
     fontSize: 14,
     fontWeight: '700',
   },

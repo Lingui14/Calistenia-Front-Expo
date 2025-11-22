@@ -20,7 +20,6 @@ export default function ExercisesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   
-  // Form state
   const [routineName, setRoutineName] = useState('');
   const [routineDescription, setRoutineDescription] = useState('');
   const [exercises, setExercises] = useState([
@@ -142,7 +141,7 @@ export default function ExercisesScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <ActivityIndicator size="large" color="#ffffff" />
           <Text style={styles.loadingText}>Cargando rutinas...</Text>
         </View>
       </SafeAreaView>
@@ -154,7 +153,7 @@ export default function ExercisesScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" />
         }
       >
         <Text style={styles.screenTitle}>Mis Rutinas</Text>
@@ -162,12 +161,10 @@ export default function ExercisesScreen() {
           Crea tus propias rutinas personalizadas 💪
         </Text>
 
-        {/* Botón agregar */}
         <TouchableOpacity style={styles.addButton} onPress={openModal}>
           <Text style={styles.addButtonText}>+ Nueva rutina</Text>
         </TouchableOpacity>
 
-        {/* Lista de rutinas */}
         {routines.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📝</Text>
@@ -210,7 +207,6 @@ export default function ExercisesScreen() {
         )}
       </ScrollView>
 
-      {/* Modal para crear rutina */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -219,7 +215,6 @@ export default function ExercisesScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <ScrollView contentContainerStyle={styles.modalContent}>
-            {/* Header del modal */}
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Text style={styles.cancelButton}>Cancelar</Text>
@@ -232,29 +227,26 @@ export default function ExercisesScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Nombre de rutina */}
             <Text style={styles.label}>Nombre de la rutina</Text>
             <TextInput
               style={styles.input}
               placeholder="Ej: Mi rutina de push"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor="#737373"
               value={routineName}
               onChangeText={setRoutineName}
             />
 
-            {/* Descripción */}
             <Text style={styles.label}>Descripción (opcional)</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Notas sobre esta rutina..."
-              placeholderTextColor="#6b7280"
+              placeholderTextColor="#737373"
               value={routineDescription}
               onChangeText={setRoutineDescription}
               multiline
               numberOfLines={3}
             />
 
-            {/* Ejercicios */}
             <Text style={styles.sectionTitle}>Ejercicios</Text>
 
             {exercises.map((ex, index) => (
@@ -271,7 +263,7 @@ export default function ExercisesScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Nombre del ejercicio"
-                  placeholderTextColor="#6b7280"
+                  placeholderTextColor="#737373"
                   value={ex.name}
                   onChangeText={(val) => updateExercise(index, 'name', val)}
                 />
@@ -310,7 +302,6 @@ export default function ExercisesScreen() {
               </View>
             ))}
 
-            {/* Botón agregar ejercicio */}
             <TouchableOpacity style={styles.addExerciseButton} onPress={addExerciseField}>
               <Text style={styles.addExerciseButtonText}>+ Agregar ejercicio</Text>
             </TouchableOpacity>
@@ -324,7 +315,7 @@ export default function ExercisesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   scrollContent: {
     padding: 16,
@@ -336,29 +327,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 12,
   },
   screenTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   screenSubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
     marginBottom: 20,
   },
   addButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 24,
   },
   addButtonText: {
-    color: '#022c22',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -373,20 +364,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#737373',
     textAlign: 'center',
   },
   routineCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     marginBottom: 12,
   },
   routineHeader: {
@@ -397,7 +388,7 @@ const styles = StyleSheet.create({
   routineName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   deleteButton: {
     fontSize: 20,
@@ -405,17 +396,17 @@ const styles = StyleSheet.create({
   },
   routineDescription: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
   },
   exerciseCount: {
     fontSize: 12,
-    color: '#22c55e',
+    color: '#d4d4d4',
     marginTop: 8,
     marginBottom: 12,
   },
   exerciseList: {
-    backgroundColor: '#020617',
+    backgroundColor: '#171717',
     borderRadius: 8,
     padding: 8,
   },
@@ -426,22 +417,21 @@ const styles = StyleSheet.create({
   },
   exerciseNumber: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#737373',
     width: 20,
   },
   exerciseName: {
     flex: 1,
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
   },
   exerciseDetail: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#737373',
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   modalContent: {
     padding: 16,
@@ -457,33 +447,33 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   cancelButton: {
     fontSize: 16,
-    color: '#ef4444',
+    color: '#dc2626',
   },
   saveButton: {
     fontSize: 16,
-    color: '#22c55e',
+    color: '#ffffff',
     fontWeight: '600',
   },
   saveButtonDisabled: {
-    color: '#6b7280',
+    color: '#525252',
   },
   label: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 16,
   },
   textArea: {
@@ -493,17 +483,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginTop: 8,
     marginBottom: 16,
   },
   exerciseForm: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
   },
   exerciseFormHeader: {
     flexDirection: 'row',
@@ -514,11 +504,11 @@ const styles = StyleSheet.create({
   exerciseFormTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#22c55e',
+    color: '#d4d4d4',
   },
   removeExercise: {
     fontSize: 18,
-    color: '#ef4444',
+    color: '#dc2626',
     padding: 4,
   },
   exerciseNumbers: {
@@ -530,22 +520,22 @@ const styles = StyleSheet.create({
   },
   numberLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: '#737373',
     marginBottom: 4,
   },
   numberInput: {
-    backgroundColor: '#020617',
+    backgroundColor: '#171717',
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     borderRadius: 8,
     padding: 10,
     fontSize: 16,
-    color: '#e5e7eb',
+    color: '#ffffff',
     textAlign: 'center',
   },
   addExerciseButton: {
     borderWidth: 2,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     borderStyle: 'dashed',
     borderRadius: 12,
     padding: 16,
@@ -553,7 +543,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addExerciseButtonText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 14,
     fontWeight: '600',
   },

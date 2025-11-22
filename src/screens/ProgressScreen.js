@@ -15,6 +15,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { getTrainingHistory } from '../api/training';
 import useHealthData from '../hooks/useHealthData';
+import { Ionicons } from '@expo/vector-icons';
 
 // Componente de anillo de progreso
 function ProgressRing({ progress, color, size = 80, strokeWidth = 8 }) {
@@ -334,7 +335,7 @@ export default function ProgressScreen() {
 
           {history.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>🏋️</Text>
+              <Ionicons name="barbell-outline" size={48} color="#737373" />
               <Text style={styles.emptyTitle}>Aún no hay entrenamientos</Text>
               <Text style={styles.emptySubtitle}>
                 Completa tu primera sesión para ver tu progreso aquí
@@ -401,7 +402,7 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   scrollContent: {
     padding: 16,
@@ -413,29 +414,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 12,
     fontSize: 14,
   },
   screenTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   screenSubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
     marginBottom: 24,
   },
-
-  // Sección de actividad
   activitySection: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     marginBottom: 8,
   },
   sectionHeader: {
@@ -447,21 +446,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   connectedBadge: {
-    backgroundColor: '#166534',
+    backgroundColor: '#171717',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#404040',
   },
   connectedBadgeText: {
-    color: '#bbf7d0',
+    color: '#d4d4d4',
     fontSize: 11,
     fontWeight: '600',
   },
-
-  // Anillos
   ringsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -483,16 +482,16 @@ const styles = StyleSheet.create({
   ringValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginTop: 8,
   },
   ringLabel: {
     fontSize: 10,
-    color: '#6b7280',
+    color: '#737373',
   },
   ringTitle: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 2,
   },
   percentagesRow: {
@@ -503,15 +502,16 @@ const styles = StyleSheet.create({
   percentageText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#d4d4d4',
   },
-
-  // Card para conectar Health
   connectHealthCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#171717',
     padding: 16,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   connectHealthEmoji: {
     fontSize: 32,
@@ -521,17 +521,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   connectHealthTitle: {
-    color: '#93c5fd',
+    color: '#d4d4d4',
     fontSize: 14,
     fontWeight: '600',
   },
   connectHealthSubtitle: {
-    color: '#64748b',
+    color: '#737373',
     fontSize: 12,
     marginTop: 2,
   },
-
-  // Stats grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -541,46 +539,46 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     alignItems: 'center',
   },
   statValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#22c55e',
+    color: '#ffffff',
   },
   statLabel: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#a3a3a3',
     marginTop: 4,
   },
   streakCard: {
-    backgroundColor: '#1c1917',
-    borderColor: '#f97316',
+    backgroundColor: '#0a0a0a',
+    borderColor: '#404040',
   },
   streakValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f97316',
+    color: '#ffffff',
   },
   motivationCard: {
-    backgroundColor: '#14532d',
+    backgroundColor: '#171717',
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   motivationText: {
-    color: '#bbf7d0',
+    color: '#d4d4d4',
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
   },
-
-  // Historial
   historySection: {
     marginTop: 8,
   },
@@ -595,20 +593,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#737373',
     textAlign: 'center',
   },
   historyCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
     marginBottom: 12,
   },
   historyHeader: {
@@ -619,41 +617,45 @@ const styles = StyleSheet.create({
   },
   historyDate: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#a3a3a3',
   },
   completedBadge: {
-    backgroundColor: '#166534',
+    backgroundColor: '#171717',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#404040',
   },
   completedBadgeText: {
-    color: '#bbf7d0',
+    color: '#d4d4d4',
     fontSize: 11,
     fontWeight: '600',
   },
   incompleteBadge: {
-    backgroundColor: '#78350f',
+    backgroundColor: '#171717',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#404040',
   },
   incompleteBadgeText: {
-    color: '#fde68a',
+    color: '#a3a3a3',
     fontSize: 11,
     fontWeight: '600',
   },
   historyRoutineName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: '#ffffff',
     marginBottom: 12,
   },
   historyStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#020617',
+    backgroundColor: '#171717',
     padding: 12,
     borderRadius: 12,
   },
@@ -664,16 +666,16 @@ const styles = StyleSheet.create({
   historyStatValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
   },
   historyStatLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: '#737373',
     marginTop: 2,
   },
   historyStatDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#262626',
   },
 });
