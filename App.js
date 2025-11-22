@@ -28,7 +28,6 @@ import TrainingScreen from './src/screens/TrainingScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import ExercisesScreen from './src/screens/ExercisesScreen';
 import FoodScreen from './src/screens/FoodScreen';
-import ActivityScreen from './src/screens/ActivityScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -560,11 +559,6 @@ export default function App() {
           name="Comida" 
           component={FoodScreen}
           options={{ tabBarLabel: 'Comida' }}
-        />
-        <Tab.Screen 
-          name="Actividad" 
-          component={ActivityScreen}
-          options={{ tabBarLabel: 'Actividad' }}
         />
       </Tab.Navigator>
     </NavigationContainer>

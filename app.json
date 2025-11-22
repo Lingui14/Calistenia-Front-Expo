@@ -1,29 +1,37 @@
 {
   "expo": {
-    "name": "CalisteniaApp",
-    "slug": "CalisteniaApp",
+    "name": "CalistenIA",
+    "slug": "calisteniaapp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.tuapp.calistenia",
+      "permissions": [
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED"
+      ]
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.tuapp.calistenia",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "CalistenIA necesita acceso a tus datos de salud para mostrarte tus pasos y actividad"
+      }
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      "expo-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 26
+          }
+        }
+      ]
+    ]
   }
 }

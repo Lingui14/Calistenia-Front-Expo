@@ -1,3 +1,4 @@
+// src/screens/FoodScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,8 +12,10 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { getTodayFood, logFood, deleteFood } from '../api/food';
+import * as ImagePicker from 'expo-image-picker';
+import { getTodayFood, logFood, deleteFood, analyzeFood } from '../api/food';
 
 const MEAL_TYPES = [
   { key: 'breakfast', label: '🌅 Desayuno' },
@@ -36,6 +39,12 @@ export default function FoodScreen() {
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [mealType, setMealType] = useState('snack');
+
+  // Camera/AI state
+  const [analyzing, setAnalyzing] = useState(false);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [scanModalVisible, setScanModalVisible] = useState(false);
 
   useEffect(() => {
     loadTodayFood();
@@ -67,6 +76,105 @@ export default function FoodScreen() {
     }
   }, []);
 
+  // ==================== CÁMARA E IA ====================
+
+  async function handleTakePhoto() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitamos acceso a la cámara para escanear comida');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.5, // Reducir calidad para envío más rápido
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCapturedImage(asset.uri);
+      setScanModalVisible(true);
+      analyzeImage(asset.base64);
+    }
+  }
+
+  async function handlePickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitamos acceso a la galería');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCapturedImage(asset.uri);
+      setScanModalVisible(true);
+      analyzeImage(asset.base64);
+    }
+  }
+
+  async function analyzeImage(base64) {
+    try {
+      setAnalyzing(true);
+      setAnalysisResult(null);
+
+      const result = await analyzeFood(base64);
+      setAnalysisResult(result);
+
+    } catch (err) {
+      console.error('Error analizando:', err);
+      Alert.alert('Error', err.response?.data?.message || 'No se pudo analizar la imagen');
+      setScanModalVisible(false);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function handleConfirmAnalysis() {
+    if (!analysisResult) return;
+
+    try {
+      setSaving(true);
+      await logFood({
+        name: analysisResult.name,
+        calories: analysisResult.calories || 0,
+        protein: analysisResult.protein || 0,
+        carbs: analysisResult.carbs || 0,
+        fat: analysisResult.fat || 0,
+        meal_type: mealType,
+      });
+
+      setScanModalVisible(false);
+      setCapturedImage(null);
+      setAnalysisResult(null);
+      loadTodayFood();
+      Alert.alert('✅ Guardado', `${analysisResult.name} registrado correctamente`);
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancelScan() {
+    setScanModalVisible(false);
+    setCapturedImage(null);
+    setAnalysisResult(null);
+  }
+
+  // ==================== MODAL MANUAL ====================
+
   function openModal() {
     setName('');
     setCalories('');
@@ -97,7 +205,6 @@ export default function FoodScreen() {
       setModalVisible(false);
       loadTodayFood();
     } catch (err) {
-      console.error('Error guardando comida:', err);
       Alert.alert('Error', 'No se pudo guardar');
     } finally {
       setSaving(false);
@@ -105,31 +212,29 @@ export default function FoodScreen() {
   }
 
   function handleDeleteFood(food) {
-    Alert.alert(
-      'Eliminar',
-      `¿Eliminar "${food.name}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteFood(food.id);
-              loadTodayFood();
-            } catch (err) {
-              Alert.alert('Error', 'No se pudo eliminar');
-            }
-          },
+    Alert.alert('Eliminar', `¿Eliminar "${food.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteFood(food.id);
+            loadTodayFood();
+          } catch (err) {
+            Alert.alert('Error', 'No se pudo eliminar');
+          }
         },
-      ]
-    );
+      },
+    ]);
   }
 
   function getMealLabel(type) {
-    const meal = MEAL_TYPES.find(m => m.key === type);
+    const meal = MEAL_TYPES.find((m) => m.key === type);
     return meal ? meal.label : '🍽️';
   }
+
+  // ==================== RENDER ====================
 
   if (loading) {
     return (
@@ -179,9 +284,18 @@ export default function FoodScreen() {
           </View>
         </View>
 
-        {/* Botón agregar */}
+        {/* Botones de acción */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.scanButton} onPress={handleTakePhoto}>
+            <Text style={styles.scanButtonText}>📸 Escanear comida</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.galleryButton} onPress={handlePickImage}>
+            <Text style={styles.galleryButtonText}>🖼️</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.addButton} onPress={openModal}>
-          <Text style={styles.addButtonText}>+ Agregar comida</Text>
+          <Text style={styles.addButtonText}>+ Agregar manualmente</Text>
         </TouchableOpacity>
 
         {/* Lista de comidas */}
@@ -190,7 +304,7 @@ export default function FoodScreen() {
             <Text style={styles.emptyEmoji}>🍽️</Text>
             <Text style={styles.emptyTitle}>Sin comidas registradas</Text>
             <Text style={styles.emptySubtitle}>
-              Registra tu primera comida del día
+              Escanea con la cámara o agrega manualmente
             </Text>
           </View>
         ) : (
@@ -217,7 +331,122 @@ export default function FoodScreen() {
         <Text style={styles.hint}>💡 Mantén presionado para eliminar</Text>
       </ScrollView>
 
-      {/* Modal agregar comida */}
+      {/* ==================== MODAL ESCANEO IA ==================== */}
+      <Modal
+        visible={scanModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCancelScan}
+      >
+        <SafeAreaView style={styles.scanModalContainer}>
+          <View style={styles.scanModalHeader}>
+            <TouchableOpacity onPress={handleCancelScan}>
+              <Text style={styles.cancelButton}>Cancelar</Text>
+            </TouchableOpacity>
+            <Text style={styles.scanModalTitle}>Análisis IA</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.scanModalContent}>
+            {/* Imagen capturada */}
+            {capturedImage && (
+              <Image source={{ uri: capturedImage }} style={styles.capturedImage} />
+            )}
+
+            {/* Estado de análisis */}
+            {analyzing && (
+              <View style={styles.analyzingContainer}>
+                <ActivityIndicator size="large" color="#22c55e" />
+                <Text style={styles.analyzingText}>Analizando con IA...</Text>
+                <Text style={styles.analyzingSubtext}>
+                  Identificando ingredientes y calculando nutrientes
+                </Text>
+              </View>
+            )}
+
+            {/* Resultado del análisis */}
+            {analysisResult && !analyzing && (
+              <View style={styles.resultContainer}>
+                <View style={styles.resultHeader}>
+                  <Text style={styles.resultName}>{analysisResult.name}</Text>
+                  <View style={[
+                    styles.confidenceBadge,
+                    analysisResult.confidence === 'alta' && styles.confidenceHigh,
+                    analysisResult.confidence === 'media' && styles.confidenceMedium,
+                    analysisResult.confidence === 'baja' && styles.confidenceLow,
+                  ]}>
+                    <Text style={styles.confidenceText}>
+                      {analysisResult.confidence === 'alta' ? '✓ Alta precisión' :
+                       analysisResult.confidence === 'media' ? '~ Precisión media' :
+                       '? Precisión baja'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Nutrientes */}
+                <View style={styles.nutrientsGrid}>
+                  <View style={styles.nutrientCard}>
+                    <Text style={styles.nutrientValue}>{analysisResult.calories}</Text>
+                    <Text style={styles.nutrientLabel}>kcal</Text>
+                  </View>
+                  <View style={styles.nutrientCard}>
+                    <Text style={styles.nutrientValue}>{analysisResult.protein}g</Text>
+                    <Text style={styles.nutrientLabel}>Proteína</Text>
+                  </View>
+                  <View style={styles.nutrientCard}>
+                    <Text style={styles.nutrientValue}>{analysisResult.carbs}g</Text>
+                    <Text style={styles.nutrientLabel}>Carbs</Text>
+                  </View>
+                  <View style={styles.nutrientCard}>
+                    <Text style={styles.nutrientValue}>{analysisResult.fat}g</Text>
+                    <Text style={styles.nutrientLabel}>Grasa</Text>
+                  </View>
+                </View>
+
+                {analysisResult.notes && (
+                  <Text style={styles.resultNotes}>💡 {analysisResult.notes}</Text>
+                )}
+
+                {/* Selector de tipo de comida */}
+                <Text style={styles.mealTypeLabel}>¿En qué comida lo registramos?</Text>
+                <View style={styles.mealTypeRow}>
+                  {MEAL_TYPES.map((meal) => (
+                    <TouchableOpacity
+                      key={meal.key}
+                      style={[
+                        styles.mealTypeButton,
+                        mealType === meal.key && styles.mealTypeButtonActive,
+                      ]}
+                      onPress={() => setMealType(meal.key)}
+                    >
+                      <Text style={styles.mealTypeText}>{meal.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Botón confirmar */}
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleConfirmAnalysis}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#022c22" />
+                  ) : (
+                    <Text style={styles.confirmButtonText}>✓ Guardar comida</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.retryButton} onPress={handleTakePhoto}>
+                  <Text style={styles.retryButtonText}>📸 Tomar otra foto</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ==================== MODAL MANUAL (existente) ==================== */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -285,7 +514,7 @@ export default function FoodScreen() {
                   style={styles.macroInput}
                   placeholder="0"
                   placeholderTextColor="#6b7280"
-                  keyboardType="decimal-pad"
+                  keyboardType="number-pad"
                   value={protein}
                   onChangeText={setProtein}
                 />
@@ -296,7 +525,7 @@ export default function FoodScreen() {
                   style={styles.macroInput}
                   placeholder="0"
                   placeholderTextColor="#6b7280"
-                  keyboardType="decimal-pad"
+                  keyboardType="number-pad"
                   value={carbs}
                   onChangeText={setCarbs}
                 />
@@ -307,7 +536,7 @@ export default function FoodScreen() {
                   style={styles.macroInput}
                   placeholder="0"
                   placeholderTextColor="#6b7280"
-                  keyboardType="decimal-pad"
+                  keyboardType="number-pad"
                   value={fat}
                   onChangeText={setFat}
                 />
@@ -337,6 +566,7 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#9ca3af',
     marginTop: 12,
+    fontSize: 14,
   },
   screenTitle: {
     fontSize: 24,
@@ -347,7 +577,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     marginTop: 4,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   summaryCard: {
     backgroundColor: '#0f172a',
@@ -387,18 +617,52 @@ const styles = StyleSheet.create({
     height: 30,
     backgroundColor: '#1f2937',
   },
-  addButton: {
+
+  // Botones de acción
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  scanButton: {
+    flex: 1,
     backgroundColor: '#22c55e',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 20,
   },
-  addButtonText: {
+  scanButtonText: {
     color: '#022c22',
     fontSize: 16,
     fontWeight: '700',
   },
+  galleryButton: {
+    backgroundColor: '#1f2937',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 56,
+  },
+  galleryButtonText: {
+    fontSize: 20,
+  },
+  addButton: {
+    backgroundColor: '#1f2937',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  addButtonText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Lista de comidas
   emptyState: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -416,6 +680,7 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     color: '#6b7280',
+    textAlign: 'center',
   },
   foodCard: {
     backgroundColor: '#0f172a',
@@ -460,71 +725,209 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
   },
-  // Modal
+
+  // Modal escaneo
+  scanModalContainer: {
+    flex: 1,
+    backgroundColor: '#020617',
+  },
+  scanModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2937',
+  },
+  scanModalTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#e5e7eb',
+  },
+  scanModalContent: {
+    padding: 16,
+  },
+  capturedImage: {
+    width: '100%',
+    height: 250,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  analyzingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  analyzingText: {
+    color: '#22c55e',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  analyzingSubtext: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+
+  // Resultado
+  resultContainer: {
+    paddingTop: 8,
+  },
+  resultHeader: {
+    marginBottom: 20,
+  },
+  resultName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#e5e7eb',
+    marginBottom: 8,
+  },
+  confidenceBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  confidenceHigh: {
+    backgroundColor: '#166534',
+  },
+  confidenceMedium: {
+    backgroundColor: '#854d0e',
+  },
+  confidenceLow: {
+    backgroundColor: '#7f1d1d',
+  },
+  confidenceText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  nutrientsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  nutrientCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#0f172a',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1f2937',
+  },
+  nutrientValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#22c55e',
+  },
+  nutrientLabel: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 4,
+  },
+  resultNotes: {
+    color: '#9ca3af',
+    fontSize: 14,
+    backgroundColor: '#0f172a',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  mealTypeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e5e7eb',
+    marginBottom: 12,
+  },
+  confirmButton: {
+    backgroundColor: '#22c55e',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  confirmButtonText: {
+    color: '#022c22',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  retryButton: {
+    backgroundColor: '#1f2937',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  retryButtonText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Modal manual
   modalContainer: {
     flex: 1,
     backgroundColor: '#020617',
   },
   modalContent: {
     padding: 16,
-    paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
-    paddingTop: 8,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#e5e7eb',
   },
   cancelButton: {
-    fontSize: 16,
     color: '#ef4444',
+    fontSize: 16,
   },
   saveButton: {
-    fontSize: 16,
     color: '#22c55e',
+    fontSize: 16,
     fontWeight: '600',
   },
   saveButtonDisabled: {
-    color: '#6b7280',
+    opacity: 0.5,
   },
   label: {
-    fontSize: 13,
-    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e5e7eb',
     marginBottom: 8,
+    marginTop: 16,
   },
   input: {
     backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1f2937',
     borderRadius: 12,
     padding: 14,
-    fontSize: 16,
     color: '#e5e7eb',
-    marginBottom: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#1f2937',
   },
   mealTypeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 20,
   },
   mealTypeButton: {
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1f2937',
+    borderRadius: 999,
+    backgroundColor: '#1f2937',
   },
   mealTypeButtonActive: {
-    backgroundColor: '#166534',
-    borderColor: '#22c55e',
+    backgroundColor: '#22c55e',
   },
   mealTypeText: {
     fontSize: 13,
@@ -538,18 +941,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   macroLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginBottom: 4,
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 6,
   },
   macroInput: {
     backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1f2937',
     borderRadius: 10,
     padding: 12,
-    fontSize: 16,
     color: '#e5e7eb',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#1f2937',
     textAlign: 'center',
   },
 });

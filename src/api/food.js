@@ -23,3 +23,9 @@ export async function deleteFood(foodId) {
   const res = await api.delete(`/api/food/${foodId}`);
   return res.data;
 }
+
+// Analizar imagen de comida con IA
+export async function analyzeFood(imageBase64) {
+  const res = await api.post('/api/food/analyze', { image: imageBase64 });
+  return res.data;
+}

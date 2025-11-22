@@ -8,8 +8,46 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
+  Platform,
+  Alert,
 } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { getTrainingHistory } from '../api/training';
+import useHealthData from '../hooks/useHealthData';
+
+// Componente de anillo de progreso
+function ProgressRing({ progress, color, size = 80, strokeWidth = 8 }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const progressValue = Math.min(progress, 1);
+  const strokeDashoffset = circumference - progressValue * circumference;
+
+  return (
+    <Svg width={size} height={size}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke="#1f2937"
+        strokeWidth={strokeWidth}
+        fill="none"
+      />
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeDasharray={circumference}
+        strokeDashoffset={strokeDashoffset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </Svg>
+  );
+}
 
 export default function ProgressScreen() {
   const [history, setHistory] = useState([]);
@@ -21,6 +59,25 @@ export default function ProgressScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Metas de actividad (podrías moverlas a un estado editable)
+  const GOALS = {
+    steps: 10000,
+    calories: 500,
+    distance: 5000, // metros
+  };
+
+  // Hook de Health Connect
+  const {
+    steps: healthSteps,
+    distance: healthDistance,
+    calories: healthCalories,
+    isAvailable: healthAvailable,
+    hasPermissions: healthPermissions,
+    loading: healthLoading,
+    error: healthError,
+    refresh: refreshHealth,
+  } = useHealthData();
 
   useEffect(() => {
     loadHistory();
@@ -42,66 +99,45 @@ export default function ProgressScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const data = await getTrainingHistory();
-      setHistory(data);
-      calculateStats(data);
+      await Promise.all([loadHistory(), refreshHealth()]);
     } catch (err) {
       console.error('Error refrescando:', err);
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [refreshHealth]);
 
   function calculateStats(sessions) {
     if (!sessions || sessions.length === 0) {
-      setStats({
-        totalSessions: 0,
-        totalMinutes: 0,
-        totalExercises: 0,
-        currentStreak: 0,
-      });
+      setStats({ totalSessions: 0, totalMinutes: 0, totalExercises: 0, currentStreak: 0 });
       return;
     }
 
-    // Total de sesiones completadas
-    const completedSessions = sessions.filter(s => s.completed);
+    const completedSessions = sessions.filter((s) => s.completed);
     const totalSessions = completedSessions.length;
-
-    // Total de minutos
-    const totalMinutes = completedSessions.reduce((acc, s) => {
-      return acc + (s.total_duration || 0);
-    }, 0);
-
-    // Total de ejercicios (sumando los logs de cada sesión)
-    const totalExercises = completedSessions.reduce((acc, s) => {
-      return acc + (s.ExerciseLogs?.length || 0);
-    }, 0);
-
-    // Calcular racha actual
+    const totalMinutes = completedSessions.reduce((acc, s) => acc + (s.total_duration || 0), 0);
+    const totalExercises = completedSessions.reduce(
+      (acc, s) => acc + (s.ExerciseLogs?.length || 0),
+      0
+    );
     const currentStreak = calculateStreak(completedSessions);
 
-    setStats({
-      totalSessions,
-      totalMinutes,
-      totalExercises,
-      currentStreak,
-    });
+    setStats({ totalSessions, totalMinutes, totalExercises, currentStreak });
   }
 
   function calculateStreak(sessions) {
     if (sessions.length === 0) return 0;
 
-    // Ordenar por fecha descendente
-    const sorted = [...sessions].sort(
-      (a, b) => new Date(b.end_time || b.start_time) - new Date(a.end_time || a.start_time)
+    const sortedSessions = [...sessions].sort(
+      (a, b) => new Date(b.start_time) - new Date(a.start_time)
     );
 
     let streak = 0;
     let currentDate = new Date();
     currentDate.setHours(0, 0, 0, 0);
 
-    for (const session of sorted) {
-      const sessionDate = new Date(session.end_time || session.start_time);
+    for (const session of sortedSessions) {
+      const sessionDate = new Date(session.start_time);
       sessionDate.setHours(0, 0, 0, 0);
 
       const diffDays = Math.floor((currentDate - sessionDate) / (1000 * 60 * 60 * 24));
@@ -109,7 +145,7 @@ export default function ProgressScreen() {
       if (diffDays === 0 || diffDays === 1) {
         streak++;
         currentDate = sessionDate;
-      } else if (diffDays > 1) {
+      } else {
         break;
       }
     }
@@ -124,10 +160,10 @@ export default function ProgressScreen() {
   }
 
   function formatDuration(minutes) {
-    if (!minutes || minutes === 0) return '0 min';
-    if (minutes < 60) return `${minutes} min`;
+    if (!minutes || minutes === 0) return '0m';
     const hrs = Math.floor(minutes / 60);
     const mins = minutes % 60;
+    if (hrs === 0) return `${mins}m`;
     return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
   }
 
@@ -141,6 +177,11 @@ export default function ProgressScreen() {
       </SafeAreaView>
     );
   }
+
+  // Calcular progreso de actividad
+  const stepsProgress = healthSteps / GOALS.steps;
+  const caloriesProgress = healthCalories / GOALS.calories;
+  const distanceProgress = healthDistance / GOALS.distance;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,7 +201,98 @@ export default function ProgressScreen() {
           Mantén la constancia y alcanza tus metas 💪
         </Text>
 
-        {/* Stats Cards */}
+        {/* ==================== SECCIÓN DE ACTIVIDAD DIARIA ==================== */}
+        <View style={styles.activitySection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Actividad de hoy</Text>
+            {healthAvailable && healthPermissions && (
+              <View style={styles.connectedBadge}>
+                <Text style={styles.connectedBadgeText}>✓ Health Connect</Text>
+              </View>
+            )}
+          </View>
+
+          {healthAvailable && healthPermissions ? (
+            <>
+              {/* Anillos de progreso */}
+              <View style={styles.ringsContainer}>
+                <View style={styles.ringItem}>
+                  <View style={styles.ringWrapper}>
+                    <ProgressRing progress={stepsProgress} color="#22c55e" size={80} strokeWidth={8} />
+                    <View style={styles.ringContent}>
+                      <Text style={styles.ringEmoji}>👟</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.ringValue}>{healthSteps.toLocaleString()}</Text>
+                  <Text style={styles.ringLabel}>/ {GOALS.steps.toLocaleString()}</Text>
+                  <Text style={styles.ringTitle}>Pasos</Text>
+                </View>
+
+                <View style={styles.ringItem}>
+                  <View style={styles.ringWrapper}>
+                    <ProgressRing progress={caloriesProgress} color="#f97316" size={80} strokeWidth={8} />
+                    <View style={styles.ringContent}>
+                      <Text style={styles.ringEmoji}>🔥</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.ringValue}>{healthCalories}</Text>
+                  <Text style={styles.ringLabel}>/ {GOALS.calories} kcal</Text>
+                  <Text style={styles.ringTitle}>Calorías</Text>
+                </View>
+
+                <View style={styles.ringItem}>
+                  <View style={styles.ringWrapper}>
+                    <ProgressRing progress={distanceProgress} color="#3b82f6" size={80} strokeWidth={8} />
+                    <View style={styles.ringContent}>
+                      <Text style={styles.ringEmoji}>🚶</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.ringValue}>{(healthDistance / 1000).toFixed(1)}</Text>
+                  <Text style={styles.ringLabel}>/ {GOALS.distance / 1000} km</Text>
+                  <Text style={styles.ringTitle}>Distancia</Text>
+                </View>
+              </View>
+
+              {/* Porcentajes */}
+              <View style={styles.percentagesRow}>
+                <Text style={[styles.percentageText, { color: '#22c55e' }]}>
+                  {Math.round(stepsProgress * 100)}%
+                </Text>
+                <Text style={[styles.percentageText, { color: '#f97316' }]}>
+                  {Math.round(caloriesProgress * 100)}%
+                </Text>
+                <Text style={[styles.percentageText, { color: '#3b82f6' }]}>
+                  {Math.round(distanceProgress * 100)}%
+                </Text>
+              </View>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={styles.connectHealthCard}
+              onPress={() => {
+                Alert.alert(
+                  'Conectar Health Connect',
+                  'Asegúrate de tener Health Connect instalado desde Play Store. Ve a Ajustes > Apps > Health Connect para configurarlo.',
+                  [{ text: 'Entendido' }]
+                );
+              }}
+            >
+              <Text style={styles.connectHealthEmoji}>📱</Text>
+              <View style={styles.connectHealthText}>
+                <Text style={styles.connectHealthTitle}>Conectar Health Connect</Text>
+                <Text style={styles.connectHealthSubtitle}>
+                  {healthError || 'Sincroniza tus pasos y calorías automáticamente'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ==================== STATS DE ENTRENAMIENTOS ==================== */}
+        <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>
+          Estadísticas de entrenamiento
+        </Text>
+
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.totalSessions}</Text>
@@ -183,7 +315,7 @@ export default function ProgressScreen() {
           </View>
         </View>
 
-        {/* Motivational Message */}
+        {/* Mensaje motivacional */}
         {stats.currentStreak > 0 && (
           <View style={styles.motivationCard}>
             <Text style={styles.motivationText}>
@@ -196,7 +328,7 @@ export default function ProgressScreen() {
           </View>
         )}
 
-        {/* History Section */}
+        {/* ==================== HISTORIAL ==================== */}
         <View style={styles.historySection}>
           <Text style={styles.sectionTitle}>Historial de entrenamientos</Text>
 
@@ -212,9 +344,7 @@ export default function ProgressScreen() {
             history.map((session) => (
               <View key={session.id} style={styles.historyCard}>
                 <View style={styles.historyHeader}>
-                  <Text style={styles.historyDate}>
-                    {formatDate(session.start_time)}
-                  </Text>
+                  <Text style={styles.historyDate}>{formatDate(session.start_time)}</Text>
                   {session.completed ? (
                     <View style={styles.completedBadge}>
                       <Text style={styles.completedBadgeText}>✓ Completado</Text>
@@ -298,6 +428,110 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 24,
   },
+
+  // Sección de actividad
+  activitySection: {
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    marginBottom: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#e5e7eb',
+  },
+  connectedBadge: {
+    backgroundColor: '#166534',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  connectedBadgeText: {
+    color: '#bbf7d0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Anillos
+  ringsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  ringItem: {
+    alignItems: 'center',
+  },
+  ringWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringContent: {
+    position: 'absolute',
+  },
+  ringEmoji: {
+    fontSize: 20,
+  },
+  ringValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#e5e7eb',
+    marginTop: 8,
+  },
+  ringLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  ringTitle: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  percentagesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 12,
+  },
+  percentageText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Card para conectar Health
+  connectHealthCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e3a8a',
+    padding: 16,
+    borderRadius: 12,
+  },
+  connectHealthEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  connectHealthText: {
+    flex: 1,
+  },
+  connectHealthTitle: {
+    color: '#93c5fd',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  connectHealthSubtitle: {
+    color: '#64748b',
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // Stats grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -345,14 +579,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
+
+  // Historial
   historySection: {
     marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#e5e7eb',
-    marginBottom: 16,
   },
   emptyState: {
     alignItems: 'center',

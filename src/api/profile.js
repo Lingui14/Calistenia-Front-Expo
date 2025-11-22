@@ -1,3 +1,4 @@
+//src/api/profile.js
 import api from './client';
 
 export async function getProfile() {
