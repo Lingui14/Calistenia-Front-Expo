@@ -1,3 +1,4 @@
+// src/api/routines.js (ACTUALIZADO)
 import api from './client';
 
 /**
@@ -18,8 +19,6 @@ export async function getActiveRoutine() {
 
 /**
  * Crea una nueva rutina personalizada
- * @param {Object} routineData - { name, description, difficulty_level, exercises }
- * @param {Array} routineData.exercises - [{ name, sets, reps, rest_time }]
  */
 export async function createRoutine(routineData) {
   const res = await api.post('/api/routines', routineData);
@@ -28,8 +27,6 @@ export async function createRoutine(routineData) {
 
 /**
  * Actualiza una rutina existente
- * @param {string} routineId - ID de la rutina
- * @param {Object} routineData - Datos a actualizar
  */
 export async function updateRoutine(routineId, routineData) {
   const res = await api.put(`/api/routines/${routineId}`, routineData);
@@ -38,7 +35,6 @@ export async function updateRoutine(routineId, routineData) {
 
 /**
  * Elimina una rutina
- * @param {string} routineId - ID de la rutina a eliminar
  */
 export async function deleteRoutine(routineId) {
   const res = await api.delete(`/api/routines/${routineId}`);
@@ -54,8 +50,28 @@ export async function generateRoutine() {
 }
 
 /**
+ * NUEVO: Genera una rutina con IA de Grok
+ */
+export async function generateRoutineAI(params = {}) {
+  const res = await api.post('/api/routines/generate-ai', {
+    customPrompt: params.customPrompt,
+    workoutType: params.workoutType,
+    duration: params.duration,
+    intensity: params.intensity,
+  });
+  return res.data;
+}
+
+/**
+ * NUEVO: Obtiene sugerencias rápidas
+ */
+export async function getAISuggestions() {
+  const res = await api.get('/api/routines/ai-suggestions');
+  return res.data;
+}
+
+/**
  * Marca/desmarca una rutina como favorita
- * @param {string} routineId - ID de la rutina
  */
 export async function toggleFavorite(routineId) {
   const res = await api.post(`/api/routines/${routineId}/favorite`);

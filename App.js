@@ -11,8 +11,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SpotifyAuthScreen from './src/screens/SpotifyAuthScreen';
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -29,6 +31,7 @@ import ProgressScreen from './src/screens/ProgressScreen';
 import ExercisesScreen from './src/screens/ExercisesScreen';
 import FoodScreen from './src/screens/FoodScreen';
 
+import api from './src/api/client';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -238,7 +241,8 @@ function AuthScreen({ onLogin, onRegister }) {
   );
 }
 /* ---------------------- RUTINA SCREEN ---------------------- */
-
+// App.js - FUNCIÓN RutinaScreen (COMPLETA CON SPOTIFY)
+// App.js - FUNCIÓN RutinaScreen (ACTUALIZADA - TODO BLANCO)
 function RutinaScreen({
   activeRoutine,
   onGetActiveRoutine,
@@ -246,95 +250,397 @@ function RutinaScreen({
   onLogout,
   navigation,
 }) {
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [localRoutine, setLocalRoutine] = useState(activeRoutine);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [spotifyPlaylists, setSpotifyPlaylists] = useState([]);
+
+  useEffect(() => {
+    setLocalRoutine(activeRoutine);
+  }, [activeRoutine]);
+
+  useEffect(() => {
+    checkSpotifyStatus();
+    loadSpotifyPlaylists();
+  }, []);
+
+  async function checkSpotifyStatus() {
+    try {
+      const res = await api.get('/api/spotify/status');
+      setSpotifyConnected(res.data.connected);
+    } catch (err) {
+      setSpotifyConnected(false);
+    }
+  }
+
+  async function loadSpotifyPlaylists() {
+    try {
+      const res = await api.get('/api/spotify/playlists?mood=intense');
+      if (res.data.playlists?.length > 0) {
+        setSpotifyPlaylists(res.data.playlists.slice(0, 4));
+      }
+    } catch (err) {
+      console.log('Error cargando playlists');
+      setSpotifyPlaylists([]);
+    }
+  }
+
+  async function handleGenerateAI() {
+    try {
+      setLoadingAI(true);
+
+      const res = await api.post('/api/routines/generate-ai');
+      
+      setLocalRoutine(res.data.routine);
+      
+      Alert.alert(
+        'Rutina generada',
+        `"${res.data.routine.name}" está lista. ¿Quieres comenzar ahora?`,
+        [
+          { 
+            text: 'Ver después', 
+            style: 'cancel',
+            onPress: () => onGetActiveRoutine()
+          },
+          {
+            text: 'Empezar',
+            onPress: () => {
+              navigation.navigate('Training', {
+                routine: res.data.routine,
+              });
+            }
+          }
+        ]
+      );
+    } catch (err) {
+      console.error('Error generando rutina:', err);
+      Alert.alert('Error', 'No se pudo generar la rutina con IA. Verifica tu conexión.');
+    } finally {
+      setLoadingAI(false);
+    }
+  }
+
+  function handleStartTraining() {
+    if (!localRoutine) {
+      Alert.alert('Sin rutina', 'Primero genera una rutina para entrenar');
+      return;
+    }
+    navigation.navigate('Training', { routine: localRoutine });
+  }
+
   return (
     <SafeAreaView style={styles.screenContainer}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text style={styles.screenTitle}>Rutina de hoy</Text>
-        <Text style={styles.screenSubtitle}>
-          Genera tu rutina con CalistenIA o revisa tu rutina activa.
-        </Text>
-
-        <View style={{ flexDirection: 'row', marginTop: 16 }}>
-          <TouchableOpacity
-            style={[styles.secondaryButton, { marginRight: 8 }]}
-            onPress={onGetActiveRoutine}
-          >
-            <Text style={styles.secondaryButtonText}>Ver rutina activa</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.primaryButtonInline}
-            onPress={onGenerateRoutine}
-          >
-            <Text style={styles.primaryButtonTextInline}>
-              Generar nueva rutina
+        {/* Header */}
+        <View style={{ 
+          flexDirection: 'row', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: 16 
+        }}>
+          <View>
+            <Text style={styles.screenTitle}>Rutina de hoy</Text>
+            <Text style={styles.screenSubtitle}>
+              {new Date().toLocaleDateString('es-MX', { 
+                weekday: 'long', 
+                day: 'numeric', 
+                month: 'long' 
+              })}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onLogout}>
+            <Text style={{ color: '#666666', fontSize: 14, fontWeight: '600' }}>
+              Salir
             </Text>
           </TouchableOpacity>
         </View>
 
-        {activeRoutine ? (
-          <View style={styles.routineCard}>
-            <Text style={styles.routineTitle}>{activeRoutine.name}</Text>
-            {activeRoutine.description ? (
-              <Text style={styles.routineDescription}>
-                {activeRoutine.description}
+        {/* Botón de Spotify si NO está conectado */}
+        {!spotifyConnected && (
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#ffffff',
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 2,
+            }}
+            onPress={() => navigation.navigate('SpotifyAuth')}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ 
+                color: '#000000', 
+                fontSize: 14, 
+                fontWeight: '700',
+                marginBottom: 2,
+              }}>
+                Conectar Spotify
               </Text>
-            ) : null}
-            {activeRoutine.difficulty_level ? (
-              <Text style={styles.routineTag}>
-                Nivel: {activeRoutine.difficulty_level}
+              <Text style={{ color: '#666666', fontSize: 12, fontWeight: '600' }}>
+                Obtén playlists personalizadas
               </Text>
-            ) : null}
+            </View>
+            <Text style={{ color: '#000000', fontSize: 18, fontWeight: '600' }}>→</Text>
+          </TouchableOpacity>
+        )}
 
-            <Text style={[styles.sectionHeading, { marginTop: 16 }]}>
-              Ejercicios
+        {/* Playlists de Spotify */}
+        {spotifyPlaylists.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ 
+              fontSize: 14, 
+              color: '#a3a3a3', 
+              marginBottom: 12,
+              fontWeight: '600' 
+            }}>
+              Música para entrenar
             </Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10 }}
+            >
+              {spotifyPlaylists.map((playlist, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    padding: 18,
+                    borderRadius: 16,
+                    width: 200,
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 12,
+                    elevation: 4,
+                  }}
+                  onPress={() => Linking.openURL(playlist.external_url)}
+                  activeOpacity={0.85}
+                >
+                  <View style={{
+                    backgroundColor: '#f5f5f5',
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  }}>
+                    <Text style={{ fontSize: 20 }}>▶</Text>
+                  </View>
+                  <Text style={{ 
+                    color: '#000000', 
+                    fontSize: 15, 
+                    fontWeight: '700', 
+                    marginBottom: 4,
+                    lineHeight: 20,
+                  }} numberOfLines={2}>
+                    {playlist.name}
+                  </Text>
+                  <Text style={{ 
+                    color: '#888888', 
+                    fontSize: 12,
+                    fontWeight: '600',
+                  }}>
+                    {playlist.tracks_total} canciones
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
-            {activeRoutine.Exercises && activeRoutine.Exercises.length > 0 ? (
-              activeRoutine.Exercises.map((ex) => (
-                <View key={ex.id} style={styles.exerciseRow}>
-                  <View>
-                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                    <Text style={styles.exerciseDetail}>
-                      {ex.sets} x {ex.reps} reps • descanso {ex.rest_time}s
+        {/* Rutina activa */}
+        {localRoutine ? (
+          <View style={styles.routineCard}>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.routineTitle}>{localRoutine.name}</Text>
+              {localRoutine.description ? (
+                <Text style={styles.routineDescription}>
+                  {localRoutine.description}
+                </Text>
+              ) : null}
+              
+              {/* Badges */}
+              <View style={{ flexDirection: 'row', marginTop: 8, gap: 6 }}>
+                <View style={{
+                  backgroundColor: '#ffffff',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 6,
+                }}>
+                  <Text style={{ 
+                    fontSize: 11, 
+                    color: '#000000', 
+                    fontWeight: '700' 
+                  }}>
+                    {localRoutine.difficulty_level}
+                  </Text>
+                </View>
+                <View style={{
+                  backgroundColor: '#171717',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 6,
+                }}>
+                  <Text style={{ 
+                    fontSize: 11, 
+                    color: '#a3a3a3', 
+                    fontWeight: '600' 
+                  }}>
+                    {localRoutine.Exercises?.length || 0} ejercicios
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Lista de ejercicios */}
+            <View style={{ 
+              backgroundColor: '#171717', 
+              borderRadius: 12, 
+              padding: 12,
+              marginBottom: 16 
+            }}>
+              {localRoutine.Exercises?.slice(0, 6).map((ex, idx) => (
+                <View
+                  key={ex.id}
+                  style={{
+                    flexDirection: 'row',
+                    paddingVertical: 10,
+                    borderBottomWidth: idx < (localRoutine.Exercises.length - 1) && idx < 5 ? 1 : 0,
+                    borderBottomColor: '#262626',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ 
+                    color: '#737373', 
+                    width: 30,
+                    fontSize: 14,
+                    fontWeight: '600' 
+                  }}>
+                    {idx + 1}.
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ 
+                      color: '#ffffff', 
+                      fontSize: 15, 
+                      fontWeight: '600',
+                      marginBottom: 2 
+                    }}>
+                      {ex.name}
+                    </Text>
+                    <Text style={{ color: '#737373', fontSize: 13 }}>
+                      {ex.exercise_type === 'amrap'
+                        ? `AMRAP ${Math.floor(ex.amrap_duration / 60)} min`
+                        : ex.exercise_type === 'hiit'
+                        ? `HIIT ${ex.hiit_work_time}s/${ex.hiit_rest_time}s × ${ex.hiit_rounds}`
+                        : ex.exercise_type === 'emom'
+                        ? `EMOM ${Math.floor(ex.emom_duration / 60)} min`
+                        : `${ex.sets} × ${ex.reps} reps`}
                     </Text>
                   </View>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>
-                Aún no hay ejercicios cargados.
-              </Text>
-            )}
+              ))}
+              {localRoutine.Exercises?.length > 6 && (
+                <Text style={{ 
+                  color: '#737373', 
+                  fontSize: 12, 
+                  textAlign: 'center',
+                  marginTop: 8 
+                }}>
+                  +{localRoutine.Exercises.length - 6} ejercicios más
+                </Text>
+              )}
+            </View>
 
+            {/* Botón comenzar - BLANCO */}
             <TouchableOpacity
-              style={styles.startTrainingButton}
-              onPress={() => navigation.navigate('Training', { routine: activeRoutine })}
+              style={{
+                backgroundColor: '#ffffff',
+                paddingVertical: 16,
+                borderRadius: 999,
+                alignItems: 'center',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 12,
+                elevation: 4,
+              }}
+              onPress={handleStartTraining}
             >
-              <Text style={styles.startTrainingButtonText}>
-                🏋️ Iniciar entrenamiento
+              <Text style={{ 
+                color: '#000000', 
+                fontSize: 16, 
+                fontWeight: '700' 
+              }}>
+                Comenzar entrenamiento
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <Text style={[styles.emptyText, { marginTop: 24 }]}>
-            No tienes una rutina activa todavía. Genera una para empezar 💪
-          </Text>
+          <View style={{ 
+            alignItems: 'center', 
+            paddingVertical: 60,
+            backgroundColor: '#0a0a0a',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: '#262626',
+          }}>
+            <Text style={{ fontSize: 64, marginBottom: 16 }}></Text>
+            <Text style={{ 
+              fontSize: 18, 
+              color: '#ffffff', 
+              fontWeight: '700', 
+              marginBottom: 16 
+            }}>
+              Sin rutina activa
+            </Text>
+            
+            {/* Botón generar rutina - BLANCO */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#ffffff',
+                paddingVertical: 14,
+                paddingHorizontal: 32,
+                borderRadius: 999,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 12,
+                elevation: 4,
+              }}
+              onPress={handleGenerateAI}
+              disabled={loadingAI}
+            >
+              {loadingAI ? (
+                <ActivityIndicator color="#000000" />
+              ) : (
+                <Text style={{ 
+                  color: '#000000', 
+                  fontSize: 15, 
+                  fontWeight: '700' 
+                }}>
+                  Generar rutina con IA
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         )}
-
-        <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-          <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
 /* ---------------------- CHAT SCREEN (Placeholder) ---------------------- */
 
-/* ---------------------- CHAT SCREEN ---------------------- */
-
-function ChatScreen() {
+function ChatScreen({ navigation }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -352,7 +658,23 @@ function ChatScreen() {
     try {
       setLoading(true);
       const reply = await sendMessage(userMessage, messages);
-      setMessages([...newMessages, { role: 'assistant', content: reply }]);
+      
+      const routineButtonPattern = /\[ROUTINE_BUTTON:([a-f0-9-]+)\]/i;
+      const match = reply.match(routineButtonPattern);
+      
+      let cleanedReply = reply;
+      let hasRoutine = false;
+      
+      if (match) {
+        hasRoutine = true;
+        cleanedReply = reply.replace(routineButtonPattern, '').trim();
+      }
+      
+      setMessages([...newMessages, { 
+        role: 'assistant', 
+        content: cleanedReply,
+        hasRoutine: hasRoutine
+      }]);
     } catch (err) {
       console.error('Error enviando mensaje:', err);
       setMessages([...newMessages, { 
@@ -367,7 +689,7 @@ function ChatScreen() {
   return (
     <SafeAreaView style={chatStyles.container}>
       <View style={chatStyles.header}>
-        <Text style={chatStyles.title}>🤖 CalistenIA</Text>
+        <Text style={chatStyles.title}> CalistenIA</Text>
         <Text style={chatStyles.subtitle}>Tu coach personal de calistenia</Text>
       </View>
 
@@ -407,25 +729,36 @@ function ChatScreen() {
           </View>
         ) : (
           messages.map((msg, index) => (
-            <View
-              key={index}
-              style={[
-                chatStyles.messageBubble,
-                msg.role === 'user' ? chatStyles.userBubble : chatStyles.aiBubble,
-              ]}
-            >
-              <Text style={[
-                chatStyles.messageText,
-                msg.role === 'user' ? chatStyles.userText : chatStyles.aiText,
-              ]}>
-                {msg.content}
-              </Text>
+            <View key={index}>
+              <View
+                style={[
+                  chatStyles.messageBubble,
+                  msg.role === 'user' ? chatStyles.userBubble : chatStyles.aiBubble,
+                ]}
+              >
+                <Text style={[
+                  chatStyles.messageText,
+                  msg.role === 'user' ? chatStyles.userText : chatStyles.aiText,
+                ]}>
+                  {msg.content}
+                </Text>
+              </View>
+              
+              {msg.role === 'assistant' && msg.hasRoutine && (
+                <TouchableOpacity
+                  style={chatStyles.routineButton}
+                  onPress={() => navigation.navigate('MisRutinas')}
+                >
+                  <Text style={chatStyles.routineButtonText}>Ver rutina generada</Text>
+                  <Text style={chatStyles.routineButtonArrow}>→</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))
         )}
         {loading && (
           <View style={[chatStyles.messageBubble, chatStyles.aiBubble, { flexDirection: 'row' }]}>
-            <ActivityIndicator size="small" color="#22c55e" />
+            <ActivityIndicator size="small" color="#ffffff" />
             <Text style={[chatStyles.aiText, { marginLeft: 8 }]}>Pensando...</Text>
           </View>
         )}
@@ -603,34 +936,36 @@ export default function App() {
   }
 
   // Stack para Rutina (incluye TrainingScreen)
-  function RutinaStack() {
-    return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="RutinaMain">
-          {(props) => (
-            <RutinaScreen
-              {...props}
-              activeRoutine={activeRoutine}
-              onGetActiveRoutine={handleGetActiveRoutine}
-              onGenerateRoutine={handleGenerateRoutine}
-              onLogout={handleLogout}
-            />
-          )}
-        </Stack.Screen>
-        <Stack.Screen 
-          name="Training" 
-          component={TrainingScreen}
-          options={{ 
-            headerShown: true, 
-            title: 'Entrenamiento', 
-            headerStyle: { backgroundColor: '#000000' }, 
-            headerTintColor: '#ffffff' 
-          }}
-        />
-      </Stack.Navigator>
-    );
-  }
-
+function RutinaStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        headerStyle: { backgroundColor: '#000000' },
+        headerTintColor: '#ffffff',
+      }}
+    >
+      <Stack.Screen name="RutinaMain" component={RutinaScreen} />
+      <Stack.Screen 
+        name="Training" 
+        component={TrainingScreen}
+        options={{ 
+          headerShown: true,
+          title: 'Entrenamiento',
+        }}
+      />
+      <Stack.Screen 
+        name="SpotifyAuth" 
+        component={SpotifyAuthScreen}
+        options={{ 
+          headerShown: true,
+          title: 'Conectar Spotify',
+          presentation: 'modal',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
   // App principal con 4 tabs
   return (
     <NavigationContainer>
@@ -1082,5 +1417,35 @@ export const chatStyles = StyleSheet.create({
   sendButtonText: {
     fontSize: 18,
     color: '#000000',
+  },
+  routineButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    marginLeft: 4,
+    maxWidth: '80%',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  routineButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  routineButtonArrow: {
+    color: '#000000',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

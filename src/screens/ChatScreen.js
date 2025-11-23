@@ -1,8 +1,26 @@
-function ChatScreen() {
+// src/screens/ChatScreen.js - COMPLETO
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { sendMessage } from '../api/chat';
+
+export default function ChatScreen({ onRoutineGenerated }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const navigation = useNavigation();
 
   async function handleSend() {
     if (!input.trim() || loading) return;
@@ -16,7 +34,33 @@ function ChatScreen() {
     try {
       setLoading(true);
       const reply = await sendMessage(userMessage, messages);
-      setMessages([...newMessages, { role: 'assistant', content: reply }]);
+      
+      // PARSEAR el marcador [ROUTINE_BUTTON:uuid]
+      const routineButtonPattern = /\[ROUTINE_BUTTON:([a-f0-9-]+)\]/i;
+      const match = reply.match(routineButtonPattern);
+      
+      let cleanedReply = reply;
+      let hasRoutine = false;
+      let routineId = null;
+      
+      if (match) {
+        routineId = match[1];
+        hasRoutine = true;
+        // Limpiar el mensaje (quitar el marcador)
+        cleanedReply = reply.replace(routineButtonPattern, '').trim();
+      }
+      
+      setMessages([...newMessages, { 
+        role: 'assistant', 
+        content: cleanedReply,
+        hasRoutine: hasRoutine,
+        routineId: routineId
+      }]);
+      
+      // Si se generó una rutina, actualizar (solo si la función existe)
+      if (hasRoutine && onRoutineGenerated) {
+        onRoutineGenerated();
+      }
     } catch (err) {
       console.error('Error enviando mensaje:', err);
       setMessages([...newMessages, { 
@@ -26,6 +70,10 @@ function ChatScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleGoToRoutine() {
+    navigation.navigate('Rutina');
   }
 
   return (
@@ -71,25 +119,39 @@ function ChatScreen() {
           </View>
         ) : (
           messages.map((msg, index) => (
-            <View
-              key={index}
-              style={[
-                chatStyles.messageBubble,
-                msg.role === 'user' ? chatStyles.userBubble : chatStyles.aiBubble,
-              ]}
-            >
-              <Text style={[
-                chatStyles.messageText,
-                msg.role === 'user' ? chatStyles.userText : chatStyles.aiText,
-              ]}>
-                {msg.content}
-              </Text>
+            <View key={index}>
+              <View
+                style={[
+                  chatStyles.messageBubble,
+                  msg.role === 'user' ? chatStyles.userBubble : chatStyles.aiBubble,
+                ]}
+              >
+                <Text style={[
+                  chatStyles.messageText,
+                  msg.role === 'user' ? chatStyles.userText : chatStyles.aiText,
+                ]}>
+                  {msg.content}
+                </Text>
+              </View>
+              
+              {/* BOTÓN PARA VER RUTINA */}
+              {msg.role === 'assistant' && msg.hasRoutine && (
+                <TouchableOpacity
+                  style={chatStyles.routineButton}
+                  onPress={handleGoToRoutine}
+                >
+                  <Text style={chatStyles.routineButtonText}>
+                    Ver rutina generada
+                  </Text>
+                  <Text style={chatStyles.routineButtonArrow}>→</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))
         )}
         {loading && (
-          <View style={[chatStyles.messageBubble, chatStyles.aiBubble]}>
-            <ActivityIndicator size="small" color="#22c55e" />
+          <View style={[chatStyles.messageBubble, chatStyles.aiBubble, { flexDirection: 'row' }]}>
+            <ActivityIndicator size="small" color="#ffffff" />
             <Text style={[chatStyles.aiText, { marginLeft: 8 }]}>Pensando...</Text>
           </View>
         )}
@@ -120,130 +182,170 @@ function ChatScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
 
-  const chatStyles = StyleSheet.create({
+const chatStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: '#1a1a1a',
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#e5e7eb',
+    color: '#ffffff',
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
+    fontSize: 13,
+    color: '#666666',
+    fontWeight: '600',
   },
   messagesContainer: {
     flex: 1,
   },
   messagesContent: {
     padding: 16,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   emptyChat: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingTop: 60,
   },
   emptyChatEmoji: {
-    fontSize: 48,
+    fontSize: 64,
     marginBottom: 16,
   },
   emptyChatText: {
-    fontSize: 14,
-    color: '#9ca3af',
+    fontSize: 15,
+    color: '#a3a3a3',
     textAlign: 'center',
     lineHeight: 22,
-    paddingHorizontal: 20,
+    paddingHorizontal: 32,
+    marginBottom: 32,
   },
   suggestions: {
-    marginTop: 24,
+    gap: 8,
     width: '100%',
+    paddingHorizontal: 16,
   },
   suggestionChip: {
-    backgroundColor: '#1f2937',
-    paddingHorizontal: 16,
+    backgroundColor: '#171717',
     paddingVertical: 12,
-    borderRadius: 20,
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#262626',
   },
   suggestionText: {
-    color: '#9ca3af',
-    fontSize: 13,
-    textAlign: 'center',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   messageBubble: {
     maxWidth: '80%',
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 8,
   },
   userBubble: {
+    backgroundColor: '#ffffff',
     alignSelf: 'flex-end',
-    backgroundColor: '#22c55e',
   },
   aiBubble: {
+    backgroundColor: '#171717',
     alignSelf: 'flex-start',
-    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   messageText: {
     fontSize: 14,
     lineHeight: 20,
-    flexShrink: 1,
   },
   userText: {
-    color: '#022c22',
+    color: '#000000',
+    fontWeight: '600',
   },
   aiText: {
-    color: '#e5e7eb',
+    color: '#ffffff',
+  },
+  routineButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    marginLeft: 4,
+    maxWidth: '80%',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  routineButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  routineButtonArrow: {
+    color: '#000000',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 12,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    backgroundColor: '#000000',
     borderTopWidth: 1,
-    borderTopColor: '#1f2937',
+    borderTopColor: '#1a1a1a',
     alignItems: 'flex-end',
-    backgroundColor: '#020617',
   },
   input: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#171717',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    color: '#e5e7eb',
-    fontSize: 14,
+    paddingTop: 10,
+    color: '#ffffff',
+    fontSize: 15,
     maxHeight: 100,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: '#262626',
   },
   sendButton: {
-    marginLeft: 8,
-    backgroundColor: '#22c55e',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#262626',
+    opacity: 0.5,
   },
   sendButtonText: {
     fontSize: 18,
-    color: '#022c22',
+    color: '#000000',
+    fontWeight: '600',
   },
 });
-}
