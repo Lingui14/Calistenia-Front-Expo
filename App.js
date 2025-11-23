@@ -242,7 +242,6 @@ function AuthScreen({ onLogin, onRegister }) {
 }
 /* ---------------------- RUTINA SCREEN ---------------------- */
 // App.js - FUNCIÓN RutinaScreen (COMPLETA CON SPOTIFY)
-// App.js - FUNCIÓN RutinaScreen (ACTUALIZADA - TODO BLANCO)
 function RutinaScreen({
   activeRoutine,
   onGetActiveRoutine,
@@ -285,40 +284,43 @@ function RutinaScreen({
     }
   }
 
-  async function handleGenerateAI() {
-    try {
-      setLoadingAI(true);
-
-      const res = await api.post('/api/routines/generate-ai');
-      
-      setLocalRoutine(res.data.routine);
-      
-      Alert.alert(
-        'Rutina generada',
-        `"${res.data.routine.name}" está lista. ¿Quieres comenzar ahora?`,
-        [
-          { 
-            text: 'Ver después', 
-            style: 'cancel',
-            onPress: () => onGetActiveRoutine()
-          },
-          {
-            text: 'Empezar',
-            onPress: () => {
-              navigation.navigate('Training', {
-                routine: res.data.routine,
-              });
-            }
-          }
-        ]
-      );
-    } catch (err) {
-      console.error('Error generando rutina:', err);
-      Alert.alert('Error', 'No se pudo generar la rutina con IA. Verifica tu conexión.');
-    } finally {
-      setLoadingAI(false);
+async function handleGenerateAI() {
+  try {
+    setLoadingAI(true);
+    
+    // Llamar directamente a la API (como en ExercisesScreen)
+    const res = await api.post('/api/routines/generate-ai', {});
+    
+    // Actualizar la rutina local
+    setLocalRoutine(res.data.routine);
+    
+    // Llamar también a onGetActiveRoutine para actualizar en App.js
+    if (onGetActiveRoutine) {
+      onGetActiveRoutine();
     }
+    
+    Alert.alert(
+      'Rutina generada',
+      `"${res.data.routine.name}" está lista. ¿Quieres comenzar ahora?`,
+      [
+        { text: 'Ver después', style: 'cancel' },
+        {
+          text: 'Empezar',
+          onPress: () => {
+            navigation.navigate('Training', {
+              routine: res.data.routine,
+            });
+          }
+        }
+      ]
+    );
+  } catch (err) {
+    console.error('Error generando rutina:', err);
+    Alert.alert('Error', 'No se pudo generar la rutina con IA. Verifica tu conexión.');
+  } finally {
+    setLoadingAI(false);
   }
+}
 
   function handleStartTraining() {
     if (!localRoutine) {
