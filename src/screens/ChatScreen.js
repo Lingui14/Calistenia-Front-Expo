@@ -4,20 +4,22 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { sendMessage } from '../api/chat';
 import { chatStyles } from '../styles/chatStyles';
 
-export default function ChatScreen({ navigation }) {
+export default function ChatScreen({ onRoutineGenerated }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const navigation = useNavigation();
 
   async function handleSend() {
     if (!input.trim() || loading) return;
@@ -32,13 +34,15 @@ export default function ChatScreen({ navigation }) {
       setLoading(true);
       const reply = await sendMessage(userMessage, messages);
       
-      const routineButtonPattern = /\[ROUTINE_BUTTON:([a-f0-9-]+)\]/i;
+      const routineButtonPattern = /\[ROUTINE_BUTTON:([a-zA-Z0-9-]+)\]/i;
       const match = reply.match(routineButtonPattern);
       
       let cleanedReply = reply;
       let hasRoutine = false;
+      let routineId = null;
       
       if (match) {
+        routineId = match[1];
         hasRoutine = true;
         cleanedReply = reply.replace(routineButtonPattern, '').trim();
       }
@@ -46,8 +50,13 @@ export default function ChatScreen({ navigation }) {
       setMessages([...newMessages, { 
         role: 'assistant', 
         content: cleanedReply,
-        hasRoutine: hasRoutine
+        hasRoutine: hasRoutine,
+        routineId: routineId
       }]);
+      
+      if (hasRoutine && onRoutineGenerated) {
+        onRoutineGenerated();
+      }
     } catch (err) {
       console.error('Error enviando mensaje:', err);
       setMessages([...newMessages, { 
@@ -59,10 +68,14 @@ export default function ChatScreen({ navigation }) {
     }
   }
 
+  function handleGoToRoutine() {
+    navigation.navigate('MisRutinas');
+  }
+
   return (
     <SafeAreaView style={chatStyles.container}>
       <View style={chatStyles.header}>
-        <Text style={chatStyles.title}> CalistenIA</Text>
+        <Text style={chatStyles.title}>CalistenIA</Text>
         <Text style={chatStyles.subtitle}>Tu coach personal de calistenia</Text>
       </View>
 
@@ -74,9 +87,8 @@ export default function ChatScreen({ navigation }) {
       >
         {messages.length === 0 ? (
           <View style={chatStyles.emptyChat}>
-            <Text style={chatStyles.emptyChatEmoji}>💬</Text>
             <Text style={chatStyles.emptyChatText}>
-              ¡Hola! Soy tu asistente de calistenia.{'\n\n'}
+              Soy tu asistente de calistenia.{'\n\n'}
               Pregúntame sobre ejercicios, rutinas, técnica, nutrición o lo que necesites.
             </Text>
             <View style={chatStyles.suggestions}>
@@ -88,9 +100,9 @@ export default function ChatScreen({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={chatStyles.suggestionChip}
-                onPress={() => setInput('Dame una rutina para principiantes')}
+                onPress={() => setInput('Genera una rutina HIIT de 30 minutos')}
               >
-                <Text style={chatStyles.suggestionText}>Rutina para principiantes</Text>
+                <Text style={chatStyles.suggestionText}>Rutina HIIT 30 min</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={chatStyles.suggestionChip}
@@ -120,7 +132,7 @@ export default function ChatScreen({ navigation }) {
               {msg.role === 'assistant' && msg.hasRoutine && (
                 <TouchableOpacity
                   style={chatStyles.routineButton}
-                  onPress={() => navigation.navigate('MisRutinas')}
+                  onPress={handleGoToRoutine}
                 >
                   <Text style={chatStyles.routineButtonText}>Ver rutina generada</Text>
                   <Text style={chatStyles.routineButtonArrow}>→</Text>
@@ -156,7 +168,7 @@ export default function ChatScreen({ navigation }) {
             onPress={handleSend}
             disabled={!input.trim() || loading}
           >
-            <Text style={chatStyles.sendButtonText}>➤</Text>
+            <Text style={chatStyles.sendButtonText}>→</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

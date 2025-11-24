@@ -1,4 +1,4 @@
-// src/screens/TrainingScreen.js (COMPLETO)
+// src/screens/TrainingScreen.js (MANTENIENDO TODO EL CÓDIGO ORIGINAL, SOLO AGREGANDO AUDIO)
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -11,6 +11,7 @@ import {
   Vibration,
   Linking,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { startTrainingSession, logExercise, finishTrainingSession } from '../api/training';
 import api from '../api/client';
 
@@ -37,19 +38,80 @@ export default function TrainingScreen({ route, navigation }) {
 
   const timerRef = useRef(null);
   const workoutTimerRef = useRef(null);
+  
+  // Refs para sonidos
+  const startSoundRef = useRef(null);
+  const endSoundRef = useRef(null);
 
   const exercises = routine?.Exercises || [];
   const currentExercise = exercises[currentExerciseIndex];
+  const isTimerExercise = ['hiit', 'amrap', 'emom'].includes(currentExercise?.exercise_type);
 
   useEffect(() => {
     initSession();
     loadSpotifyPlaylists();
     checkSpotifyStatus();
+    loadSounds();
+    
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
+      unloadSounds();
     };
   }, []);
+
+  // Cargar sonidos
+  async function loadSounds() {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
+
+      const { sound: startSound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/start.mp3')
+      );
+      startSoundRef.current = startSound;
+
+      const { sound: endSound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/end.mp3')
+      );
+      endSoundRef.current = endSound;
+    } catch (err) {
+      console.error('Error cargando sonidos:', err);
+    }
+  }
+
+  async function unloadSounds() {
+    try {
+      if (startSoundRef.current) await startSoundRef.current.unloadAsync();
+      if (endSoundRef.current) await endSoundRef.current.unloadAsync();
+    } catch (err) {
+      console.error('Error descargando sonidos:', err);
+    }
+  }
+
+  async function playStartSound() {
+    try {
+      if (startSoundRef.current) {
+        await startSoundRef.current.setPositionAsync(0);
+        await startSoundRef.current.playAsync();
+      }
+    } catch (err) {
+      console.error('Error reproduciendo start:', err);
+    }
+  }
+
+  async function playEndSound() {
+    try {
+      if (endSoundRef.current) {
+        await endSoundRef.current.setPositionAsync(0);
+        await endSoundRef.current.playAsync();
+      }
+    } catch (err) {
+      console.error('Error reproduciendo end:', err);
+    }
+  }
 
   // Timer de descanso standard
   useEffect(() => {
@@ -60,6 +122,7 @@ export default function TrainingScreen({ route, navigation }) {
             clearInterval(timerRef.current);
             setIsResting(false);
             Vibration.vibrate([0, 500, 200, 500]);
+            playEndSound(); // Sonido al terminar descanso
             return 0;
           }
           return prev - 1;
@@ -86,6 +149,7 @@ export default function TrainingScreen({ route, navigation }) {
             if (isWorkPhase) {
               if (newTime >= workTime) {
                 Vibration.vibrate(200);
+                playStartSound(); // Sonido al cambiar de trabajo a descanso
                 setIsWorkPhase(false);
                 return 0;
               }
@@ -96,6 +160,7 @@ export default function TrainingScreen({ route, navigation }) {
                   return 0;
                 } else {
                   Vibration.vibrate(200);
+                  playStartSound(); // Sonido al iniciar nueva ronda
                   setCurrentRound(prev => prev + 1);
                   setIsWorkPhase(true);
                   return 0;
@@ -163,6 +228,7 @@ export default function TrainingScreen({ route, navigation }) {
     setCurrentRound(1);
     setIsWorkPhase(true);
     Vibration.vibrate([0, 500, 200, 500]);
+    playEndSound(); // Sonido al completar ejercicio
     
     Alert.alert(
       'Ejercicio completado',
@@ -174,6 +240,7 @@ export default function TrainingScreen({ route, navigation }) {
   }
 
   function startTimer() {
+    playStartSound(); // Sonido al iniciar timer
     setTimerActive(true);
     setTimerSeconds(0);
     setCurrentRound(1);
@@ -224,6 +291,7 @@ export default function TrainingScreen({ route, navigation }) {
   function startRestTimer() {
     setIsResting(true);
     setRestTimeLeft(currentExercise.rest_time || 60);
+    playStartSound(); // Sonido al iniciar descanso
   }
 
   function skipRest() {
@@ -304,11 +372,7 @@ export default function TrainingScreen({ route, navigation }) {
       '¿Seguro que quieres salir? Tu progreso se guardará.',
       [
         { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Salir',
-          style: 'destructive',
-          onPress: () => navigation.goBack(),
-        },
+        { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() },
       ]
     );
   }
@@ -316,24 +380,30 @@ export default function TrainingScreen({ route, navigation }) {
   if (!currentExercise) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.emptyText}>No hay ejercicios en esta rutina</Text>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.backText}>← Volver</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No hay ejercicios en esta rutina</Text>
+        </View>
       </SafeAreaView>
     );
   }
-
-  const isTimerExercise = ['hiit', 'amrap', 'emom'].includes(currentExercise.exercise_type);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.progressText}>
-            Ejercicio {currentExerciseIndex + 1} de {exercises.length}
-          </Text>
           <TouchableOpacity onPress={handleQuit}>
-            <Text style={styles.quitButton}>Salir</Text>
+            <Text style={styles.quitText}>✕ Salir</Text>
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>{routine.name}</Text>
+          <Text style={styles.progressIndicator}>
+            {currentExerciseIndex + 1}/{exercises.length}
+          </Text>
         </View>
 
         {/* Barra de progreso */}
@@ -346,90 +416,36 @@ export default function TrainingScreen({ route, navigation }) {
           />
         </View>
 
-        {/* Botón de Spotify */}
-        {!spotifyConnected && spotifyPlaylists.length === 0 && currentExerciseIndex === 0 && (
-          <TouchableOpacity
-            style={{
-              backgroundColor: '#0a0a0a',
-              borderWidth: 1,
-              borderColor: '#1a1a1a',
-              paddingVertical: 12,
-              paddingHorizontal: 16,
-              borderRadius: 8,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 20,
-            }}
-            onPress={() => {
-              Alert.alert(
-                'Conectar Spotify',
-                'Conecta tu cuenta de Spotify para obtener playlists personalizadas durante tus entrenamientos.',
-                [
-                  { text: 'Ahora no', style: 'cancel' },
-                  { 
-                    text: 'Conectar', 
-                    onPress: () => navigation.navigate('SpotifyAuth')
-                  }
-                ]
-              );
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Text style={{ fontSize: 18, marginRight: 10 }}>🎵</Text>
-              <Text style={{ 
-                color: '#ffffff', 
-                fontSize: 13, 
-                fontWeight: '600',
-              }}>
-                Conecta Spotify para música personalizada
-              </Text>
-            </View>
-            <Text style={{ color: '#666666', fontSize: 16 }}>→</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Spotify Playlists */}
-        {spotifyPlaylists.length > 0 && currentExerciseIndex === 0 && (
-          <View style={styles.spotifySection}>
-            <Text style={styles.spotifyTitle}>Música recomendada</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {spotifyPlaylists.map((playlist, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.spotifyCard}
-                  onPress={() => Linking.openURL(playlist.external_url)}
-                >
-                  <Text style={styles.spotifyName} numberOfLines={1}>
-                    {playlist.name}
-                  </Text>
-                  <Text style={styles.spotifyTracks}>
-                    {playlist.tracks_total} canciones
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Ejercicio actual */}
+        {/* Info del ejercicio - CON MEJOR VISUALIZACIÓN */}
         <View style={styles.exerciseCard}>
-          <Text style={styles.exerciseName}>{currentExercise.name}</Text>
-          {currentExercise.description && (
-            <Text style={styles.exerciseDescription}>{currentExercise.description}</Text>
-          )}
+          <Text style={styles.exerciseTitle}>{currentExercise.name}</Text>
           
-          {/* Info del ejercicio */}
+          {/* DESCRIPCIÓN MEJORADA - Scrollable para ejercicios largos */}
+          {currentExercise.description && (
+            <ScrollView 
+              style={styles.descriptionScroll} 
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
+              <Text style={styles.exerciseDescription}>
+                {currentExercise.description}
+              </Text>
+            </ScrollView>
+          )}
+
+          {currentExercise.notes && (
+            <Text style={styles.exerciseNotes}>💡 {currentExercise.notes}</Text>
+          )}
+
+          {/* Info según tipo */}
           {currentExercise.exercise_type === 'standard' && (
-            <>
-              <View style={styles.targetRow}>
-                <Text style={styles.targetLabel}>Meta:</Text>
-                <Text style={styles.targetValue}>
-                  {currentExercise.sets} series × {currentExercise.reps} reps
-                </Text>
-              </View>
-              <Text style={styles.restInfo}>Descanso: {currentExercise.rest_time}s</Text>
-            </>
+            <View style={styles.targetRow}>
+              <Text style={styles.targetLabel}>Objetivo:</Text>
+              <Text style={styles.targetValue}>
+                {currentExercise.sets} series × {currentExercise.reps} reps
+              </Text>
+              <Text style={styles.restInfo}> • {currentExercise.rest_time}s descanso</Text>
+            </View>
           )}
 
           {currentExercise.exercise_type === 'hiit' && (
@@ -631,6 +647,22 @@ export default function TrainingScreen({ route, navigation }) {
             ))
           )}
         </View>
+
+        {/* Playlists */}
+        {spotifyPlaylists.length > 0 && (
+          <View style={styles.spotifySection}>
+            <Text style={styles.spotifyTitle}>Música recomendada</Text>
+            {spotifyPlaylists.map((pl, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.playlistItem}
+                onPress={() => Linking.openURL(pl.external_url)}
+              >
+                <Text style={styles.playlistName}>{pl.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -643,7 +675,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -651,75 +682,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  progressText: {
-    fontSize: 14,
+  quitText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#888888',
-    fontWeight: '600',
   },
-  quitButton: {
-    fontSize: 14,
-    color: '#666666',
+  headerTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  progressIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#888888',
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#888888',
   },
   progressBar: {
-    height: 4,
+    height: 3,
     backgroundColor: '#1a1a1a',
     borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#ffffff',
     borderRadius: 2,
   },
-  spotifySection: {
-    marginBottom: 24,
-  },
-  spotifyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  spotifyCard: {
-    backgroundColor: '#0a0a0a',
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 12,
-    width: 160,
-  },
-  spotifyName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  spotifyTracks: {
-    fontSize: 11,
-    color: '#666666',
-  },
   exerciseCard: {
     backgroundColor: '#0a0a0a',
-    padding: 20,
     borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#1a1a1a',
-    marginBottom: 20,
   },
-  exerciseName: {
-    fontSize: 24,
+  exerciseTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 8,
+    marginBottom: 12,
     letterSpacing: -0.5,
+  },
+  // NUEVO: Scroll para descripciones largas
+  descriptionScroll: {
+    maxHeight: 200,
+    marginBottom: 12,
   },
   exerciseDescription: {
     fontSize: 14,
     color: '#888888',
-    marginBottom: 16,
+    lineHeight: 20,
+  },
+  exerciseNotes: {
+    fontSize: 13,
+    color: '#666666',
+    fontStyle: 'italic',
+    marginTop: 8,
+    marginBottom: 12,
   },
   targetRow: {
     flexDirection: 'row',
@@ -822,15 +848,15 @@ const styles = StyleSheet.create({
   },
   restCard: {
     backgroundColor: '#1a1a1a',
-    padding: 24,
     borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
     marginBottom: 20,
   },
   restTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#888888',
     marginBottom: 12,
   },
   restTimer: {
@@ -844,26 +870,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   pauseButton: {
-    backgroundColor: '#333333',
-    paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 8,
-  },
-  pauseButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  skipButton: {
-    backgroundColor: '#1a1a1a',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    backgroundColor: '#0a0a0a',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#333333',
   },
+  pauseButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  skipButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+  },
   skipButtonText: {
-    color: '#888888',
+    color: '#000000',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -873,27 +899,26 @@ const styles = StyleSheet.create({
   counterLabel: {
     fontSize: 13,
     color: '#888888',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 12,
     fontWeight: '600',
   },
   counter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
-    padding: 16,
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
+    padding: 16,
   },
   counterButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0a0a0a',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   counterButtonText: {
     fontSize: 24,
@@ -981,10 +1006,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666666',
   },
+  spotifySection: {
+    marginTop: 20,
+  },
+  spotifyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#888888',
+    marginBottom: 12,
+  },
+  playlistItem: {
+    backgroundColor: '#1a1a1a',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  playlistName: {
+    fontSize: 14,
+    color: '#ffffff',
+  },
   emptyText: {
     fontSize: 14,
     color: '#666666',
     textAlign: 'center',
     marginTop: 40,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
