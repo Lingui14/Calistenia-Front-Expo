@@ -1,4 +1,4 @@
-// src/screens/TrainingScreen.js (COMPLETO)
+// src/screens/TrainingScreen.js
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -9,8 +9,8 @@ import {
   ScrollView,
   Alert,
   Vibration,
-  Linking,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { startTrainingSession, logExercise, finishTrainingSession } from '../api/training';
 import api from '../api/client';
 
@@ -26,124 +26,87 @@ export default function TrainingScreen({ route, navigation }) {
   const [isPaused, setIsPaused] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [exerciseLogged, setExerciseLogged] = useState(false);
-  const [spotifyPlaylists, setSpotifyPlaylists] = useState([]);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
 
-  // Estados para cronómetros HIIT/AMRAP/EMOM
   const [timerActive, setTimerActive] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [currentRound, setCurrentRound] = useState(1);
   const [isWorkPhase, setIsWorkPhase] = useState(true);
+  
+  // ══════════════════════════════════════════════════════════════
+  // NUEVO: Estados para circuit_exercises
+  // ══════════════════════════════════════════════════════════════
+  const [currentCircuitIndex, setCurrentCircuitIndex] = useState(0);
+  const [completedRounds, setCompletedRounds] = useState(0);
 
   const timerRef = useRef(null);
   const workoutTimerRef = useRef(null);
+  const startSoundRef = useRef(null);
+  const endSoundRef = useRef(null);
 
   const exercises = routine?.Exercises || [];
   const currentExercise = exercises[currentExerciseIndex];
+  const isTimerExercise = ['hiit', 'amrap', 'emom'].includes(currentExercise?.exercise_type);
+  
+  // ══════════════════════════════════════════════════════════════
+  // NUEVO: Obtener ejercicios del circuito
+  // ══════════════════════════════════════════════════════════════
+  const circuitExercises = currentExercise?.circuit_exercises || [];
+  const currentCircuitExercise = circuitExercises[currentCircuitIndex] || null;
+  const hasCircuitExercises = circuitExercises.length > 0;
 
   useEffect(() => {
     initSession();
-    loadSpotifyPlaylists();
-    checkSpotifyStatus();
+    loadSounds();
+    
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
+      unloadSounds();
     };
   }, []);
 
-  // Timer de descanso standard
-  useEffect(() => {
-    if (isResting && restTimeLeft > 0 && !isPaused) {
-      timerRef.current = setInterval(() => {
-        setRestTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            setIsResting(false);
-            Vibration.vibrate([0, 500, 200, 500]);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timerRef.current);
-    }
-  }, [isResting, restTimeLeft, isPaused]);
-
-  // Timer para HIIT/AMRAP/EMOM
-  useEffect(() => {
-    if (timerActive && !isPaused) {
-      workoutTimerRef.current = setInterval(() => {
-        setTimerSeconds(prev => {
-          const newTime = prev + 1;
-          
-          // Lógica HIIT
-          if (currentExercise.exercise_type === 'hiit') {
-            const workTime = currentExercise.hiit_work_time;
-            const restTime = currentExercise.hiit_rest_time;
-            const totalRounds = currentExercise.hiit_rounds;
-            
-            if (isWorkPhase) {
-              if (newTime >= workTime) {
-                Vibration.vibrate(200);
-                setIsWorkPhase(false);
-                return 0;
-              }
-            } else {
-              if (newTime >= restTime) {
-                if (currentRound >= totalRounds) {
-                  handleTimerComplete();
-                  return 0;
-                } else {
-                  Vibration.vibrate(200);
-                  setCurrentRound(prev => prev + 1);
-                  setIsWorkPhase(true);
-                  return 0;
-                }
-              }
-            }
-          }
-          
-          // Lógica AMRAP/EMOM
-          if (currentExercise.exercise_type === 'amrap' || currentExercise.exercise_type === 'emom') {
-            const duration = currentExercise.exercise_type === 'amrap' 
-              ? currentExercise.amrap_duration 
-              : currentExercise.emom_duration;
-              
-            if (newTime >= duration) {
-              handleTimerComplete();
-              return 0;
-            }
-          }
-          
-          return newTime;
-        });
-      }, 1000);
-    }
-    
-    return () => {
-      if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
-    };
-  }, [timerActive, isPaused, isWorkPhase, currentRound, currentExercise]);
-
-  async function checkSpotifyStatus() {
+  async function loadSounds() {
     try {
-      const res = await api.get('/api/spotify/status');
-      setSpotifyConnected(res.data.connected);
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
+      const { sound: startSound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/start.mp3')
+      );
+      startSoundRef.current = startSound;
+      const { sound: endSound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/end.mp3')
+      );
+      endSoundRef.current = endSound;
     } catch (err) {
-      setSpotifyConnected(false);
+      console.error('Error cargando sonidos:', err);
     }
   }
 
-  async function loadSpotifyPlaylists() {
+  async function unloadSounds() {
     try {
-      const res = await api.get('/api/spotify/playlists?mood=intense');
-      if (res.data.playlists?.length > 0) {
-        setSpotifyPlaylists(res.data.playlists.slice(0, 3));
+      if (startSoundRef.current) await startSoundRef.current.unloadAsync();
+      if (endSoundRef.current) await endSoundRef.current.unloadAsync();
+    } catch (err) {}
+  }
+
+  async function playStartSound() {
+    try {
+      if (startSoundRef.current) {
+        await startSoundRef.current.setPositionAsync(0);
+        await startSoundRef.current.playAsync();
       }
-    } catch (err) {
-      setSpotifyPlaylists([]);
-    }
+    } catch (err) {}
+  }
+
+  async function playEndSound() {
+    try {
+      if (endSoundRef.current) {
+        await endSoundRef.current.setPositionAsync(0);
+        await endSoundRef.current.playAsync();
+      }
+    } catch (err) {}
   }
 
   async function initSession() {
@@ -157,28 +120,149 @@ export default function TrainingScreen({ route, navigation }) {
     }
   }
 
+  // Timer de descanso standard
+  useEffect(() => {
+    if (isResting && restTimeLeft > 0 && !isPaused) {
+      timerRef.current = setInterval(() => {
+        setRestTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            setIsResting(false);
+            Vibration.vibrate([0, 500, 200, 500]);
+            playEndSound();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timerRef.current);
+    }
+  }, [isResting, restTimeLeft, isPaused]);
+
+  // ══════════════════════════════════════════════════════════════
+  // TIMER ACTUALIZADO CON ROTACIÓN DE EJERCICIOS
+  // ══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (timerActive && !isPaused) {
+      workoutTimerRef.current = setInterval(() => {
+        setTimerSeconds(prev => {
+          const newTime = prev + 1;
+          
+          // HIIT: Rotar ejercicio cada ronda
+          if (currentExercise.exercise_type === 'hiit') {
+            const workTime = currentExercise.hiit_work_time;
+            const restTime = currentExercise.hiit_rest_time;
+            const totalRounds = currentExercise.hiit_rounds;
+            
+            if (isWorkPhase) {
+              if (newTime >= workTime) {
+                Vibration.vibrate(200);
+                playStartSound();
+                setIsWorkPhase(false);
+                return 0;
+              }
+            } else {
+              if (newTime >= restTime) {
+                if (currentRound >= totalRounds) {
+                  handleTimerComplete();
+                  return 0;
+                } else {
+                  Vibration.vibrate(200);
+                  playStartSound();
+                  setCurrentRound(prev => prev + 1);
+                  setIsWorkPhase(true);
+                  
+                  // ══════ ROTAR AL SIGUIENTE EJERCICIO ══════
+                  if (hasCircuitExercises) {
+                    setCurrentCircuitIndex(prev => 
+                      (prev + 1) % circuitExercises.length
+                    );
+                  }
+                  return 0;
+                }
+              }
+            }
+          }
+          
+          // AMRAP: Timer cuenta hacia arriba
+          if (currentExercise.exercise_type === 'amrap') {
+            const duration = currentExercise.amrap_duration;
+            if (newTime >= duration) {
+              handleTimerComplete();
+              return 0;
+            }
+          }
+          
+          // EMOM: Rotar ejercicio cada 60 segundos
+          if (currentExercise.exercise_type === 'emom') {
+            const duration = currentExercise.emom_duration;
+            
+            if (newTime > 0 && newTime % 60 === 0) {
+              Vibration.vibrate(200);
+              playStartSound();
+              
+              if (hasCircuitExercises) {
+                setCurrentCircuitIndex(prev => 
+                  (prev + 1) % circuitExercises.length
+                );
+              }
+              setCurrentRound(prev => prev + 1);
+            }
+            
+            if (newTime >= duration) {
+              handleTimerComplete();
+              return 0;
+            }
+          }
+          
+          return newTime;
+        });
+      }, 1000);
+      return () => clearInterval(workoutTimerRef.current);
+    }
+  }, [timerActive, isPaused, isWorkPhase, currentRound, currentExercise, hasCircuitExercises, circuitExercises.length]);
+
+  // ══════════════════════════════════════════════════════════════
+  // NUEVO: Funciones para AMRAP manual
+  // ══════════════════════════════════════════════════════════════
+  function markRoundComplete() {
+    setCompletedRounds(prev => prev + 1);
+    Vibration.vibrate(100);
+    setCurrentCircuitIndex(0);
+  }
+
+  function nextCircuitExercise() {
+    if (hasCircuitExercises) {
+      const nextIndex = currentCircuitIndex + 1;
+      if (nextIndex >= circuitExercises.length) {
+        markRoundComplete();
+      } else {
+        setCurrentCircuitIndex(nextIndex);
+      }
+    }
+  }
+
   function handleTimerComplete() {
     setTimerActive(false);
     setTimerSeconds(0);
-    setCurrentRound(1);
-    setIsWorkPhase(true);
-    Vibration.vibrate([0, 500, 200, 500]);
+    Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+    playEndSound();
     
     Alert.alert(
       'Ejercicio completado',
-      '¡Bien hecho! ¿Continuar con el siguiente?',
-      [
-        { text: 'Continuar', onPress: () => handleCompleteExercise() }
-      ]
+      currentExercise.exercise_type === 'amrap' 
+        ? `Completaste ${completedRounds} rondas`
+        : `${currentRound} rondas completadas`,
+      [{ text: 'OK' }]
     );
   }
 
   function startTimer() {
     setTimerActive(true);
-    setTimerSeconds(0);
-    setCurrentRound(1);
-    setIsWorkPhase(true);
     setIsPaused(false);
+    setCurrentCircuitIndex(0);
+    setCompletedRounds(0);
+    playStartSound();
   }
 
   function pauseTimer() {
@@ -190,7 +274,9 @@ export default function TrainingScreen({ route, navigation }) {
     setTimerSeconds(0);
     setCurrentRound(1);
     setIsWorkPhase(true);
-    setIsPaused(false);
+    setCurrentCircuitIndex(0);
+    setCompletedRounds(0);
+    if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
   }
 
   function formatTime(seconds) {
@@ -199,31 +285,25 @@ export default function TrainingScreen({ route, navigation }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
-  function handleAddSet() {
-    if (completedSets < currentExercise.sets) {
+  function addSet() {
+    if (completedSets < (currentExercise.sets || 10)) {
       setCompletedSets(prev => prev + 1);
+      setCompletedReps(prev => prev + (currentExercise.reps || 0));
+      Vibration.vibrate(100);
     }
   }
 
-  function handleRemoveSet() {
+  function removeSet() {
     if (completedSets > 0) {
       setCompletedSets(prev => prev - 1);
-    }
-  }
-
-  function handleAddRep() {
-    setCompletedReps(prev => prev + 1);
-  }
-
-  function handleRemoveRep() {
-    if (completedReps > 0) {
-      setCompletedReps(prev => prev - 1);
+      setCompletedReps(prev => prev - (currentExercise.reps || 0));
     }
   }
 
   function startRestTimer() {
     setIsResting(true);
     setRestTimeLeft(currentExercise.rest_time || 60);
+    playStartSound();
   }
 
   function skipRest() {
@@ -237,10 +317,10 @@ export default function TrainingScreen({ route, navigation }) {
   }
 
   async function handleCompleteExercise() {
-    const isTimerExercise = ['hiit', 'amrap', 'emom'].includes(currentExercise.exercise_type);
+    const isTimerEx = ['hiit', 'amrap', 'emom'].includes(currentExercise.exercise_type);
     
-    if (!isTimerExercise && completedSets === 0) {
-      Alert.alert('Marca al menos una serie', 'Debes completar al menos 1 serie antes de continuar');
+    if (!isTimerEx && completedSets === 0) {
+      Alert.alert('Marca al menos una serie');
       return;
     }
 
@@ -249,10 +329,9 @@ export default function TrainingScreen({ route, navigation }) {
         sessionId,
         currentExercise.id,
         completedSets || 1,
-        completedReps || (currentExercise.reps * completedSets) || 0,
+        completedReps || 0,
         ''
       );
-
       setExerciseLogged(true);
 
       if (currentExerciseIndex < exercises.length - 1) {
@@ -279,21 +358,13 @@ export default function TrainingScreen({ route, navigation }) {
   async function handleFinishSession() {
     try {
       await finishTrainingSession(sessionId);
-      
       const duration = Math.floor((new Date() - sessionStartTime) / 1000 / 60);
-
       Alert.alert(
         'Entrenamiento completado',
-        `Duración: ${duration} min\nEjercicios: ${exercises.length}\n\n¡Excelente trabajo!`,
-        [
-          {
-            text: 'Ver rutina',
-            onPress: () => navigation.goBack(),
-          },
-        ]
+        `Duración: ${duration} min\nEjercicios: ${exercises.length}`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (err) {
-      console.error('Error finalizando sesión:', err);
       navigation.goBack();
     }
   }
@@ -301,14 +372,10 @@ export default function TrainingScreen({ route, navigation }) {
   function handleQuit() {
     Alert.alert(
       'Salir del entrenamiento',
-      '¿Seguro que quieres salir? Tu progreso se guardará.',
+      '¿Seguro que quieres salir?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Salir',
-          style: 'destructive',
-          onPress: () => navigation.goBack(),
-        },
+        { text: 'Salir', onPress: () => navigation.goBack() }
       ]
     );
   }
@@ -316,119 +383,50 @@ export default function TrainingScreen({ route, navigation }) {
   if (!currentExercise) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.emptyText}>No hay ejercicios en esta rutina</Text>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No hay ejercicios</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>Volver</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
-  const isTimerExercise = ['hiit', 'amrap', 'emom'].includes(currentExercise.exercise_type);
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.progressText}>
-            Ejercicio {currentExerciseIndex + 1} de {exercises.length}
-          </Text>
-          <TouchableOpacity onPress={handleQuit}>
-            <Text style={styles.quitButton}>Salir</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleQuit}>
+          <Text style={styles.quitText}>Salir</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{routine.name}</Text>
+        <Text style={styles.progress}>{currentExerciseIndex + 1}/{exercises.length}</Text>
+      </View>
 
-        {/* Barra de progreso */}
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${((currentExerciseIndex + 1) / exercises.length) * 100}%` },
-            ]}
-          />
-        </View>
-
-        {/* Botón de Spotify */}
-        {!spotifyConnected && spotifyPlaylists.length === 0 && currentExerciseIndex === 0 && (
-          <TouchableOpacity
-            style={{
-              backgroundColor: '#0a0a0a',
-              borderWidth: 1,
-              borderColor: '#1a1a1a',
-              paddingVertical: 12,
-              paddingHorizontal: 16,
-              borderRadius: 8,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 20,
-            }}
-            onPress={() => {
-              Alert.alert(
-                'Conectar Spotify',
-                'Conecta tu cuenta de Spotify para obtener playlists personalizadas durante tus entrenamientos.',
-                [
-                  { text: 'Ahora no', style: 'cancel' },
-                  { 
-                    text: 'Conectar', 
-                    onPress: () => navigation.navigate('SpotifyAuth')
-                  }
-                ]
-              );
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Text style={{ fontSize: 18, marginRight: 10 }}>🎵</Text>
-              <Text style={{ 
-                color: '#ffffff', 
-                fontSize: 13, 
-                fontWeight: '600',
-              }}>
-                Conecta Spotify para música personalizada
-              </Text>
-            </View>
-            <Text style={{ color: '#666666', fontSize: 16 }}>→</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Spotify Playlists */}
-        {spotifyPlaylists.length > 0 && currentExerciseIndex === 0 && (
-          <View style={styles.spotifySection}>
-            <Text style={styles.spotifyTitle}>Música recomendada</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {spotifyPlaylists.map((playlist, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.spotifyCard}
-                  onPress={() => Linking.openURL(playlist.external_url)}
-                >
-                  <Text style={styles.spotifyName} numberOfLines={1}>
-                    {playlist.name}
-                  </Text>
-                  <Text style={styles.spotifyTracks}>
-                    {playlist.tracks_total} canciones
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Ejercicio actual */}
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        {/* Card del ejercicio principal */}
         <View style={styles.exerciseCard}>
           <Text style={styles.exerciseName}>{currentExercise.name}</Text>
-          {currentExercise.description && (
-            <Text style={styles.exerciseDescription}>{currentExercise.description}</Text>
-          )}
           
-          {/* Info del ejercicio */}
+          <ScrollView style={styles.descriptionScroll} nestedScrollEnabled>
+            <Text style={styles.exerciseDescription}>{currentExercise.description}</Text>
+          </ScrollView>
+
+          {currentExercise.notes && (
+            <Text style={styles.exerciseNotes}>{currentExercise.notes}</Text>
+          )}
+
           {currentExercise.exercise_type === 'standard' && (
             <>
               <View style={styles.targetRow}>
-                <Text style={styles.targetLabel}>Meta:</Text>
-                <Text style={styles.targetValue}>
-                  {currentExercise.sets} series × {currentExercise.reps} reps
-                </Text>
+                <Text style={styles.targetLabel}>Series:</Text>
+                <Text style={styles.targetValue}>{currentExercise.sets}</Text>
               </View>
-              <Text style={styles.restInfo}>Descanso: {currentExercise.rest_time}s</Text>
+              <View style={styles.targetRow}>
+                <Text style={styles.targetLabel}>Reps:</Text>
+                <Text style={styles.targetValue}>{currentExercise.reps}</Text>
+              </View>
             </>
           )}
 
@@ -441,48 +439,131 @@ export default function TrainingScreen({ route, navigation }) {
           )}
 
           {currentExercise.exercise_type === 'amrap' && (
-            <Text style={styles.metaText}>
-              AMRAP {Math.floor(currentExercise.amrap_duration / 60)} minutos
-            </Text>
+            <Text style={styles.metaText}>AMRAP {Math.floor(currentExercise.amrap_duration / 60)} min</Text>
           )}
 
           {currentExercise.exercise_type === 'emom' && (
-            <Text style={styles.metaText}>
-              EMOM {Math.floor(currentExercise.emom_duration / 60)} minutos
-            </Text>
-          )}
-
-          {exerciseLogged && (
-            <View style={styles.loggedBadge}>
-              <Text style={styles.loggedBadgeText}>✓ Guardado</Text>
-            </View>
+            <Text style={styles.metaText}>EMOM {Math.floor(currentExercise.emom_duration / 60)} min</Text>
           )}
         </View>
 
-        {/* CRONÓMETRO HIIT/AMRAP/EMOM */}
+        {/* ══════════════════════════════════════════════════════════════
+            NUEVO: Card del ejercicio actual del circuito
+            ══════════════════════════════════════════════════════════════ */}
+        {isTimerExercise && hasCircuitExercises && (
+          <View style={styles.circuitCard}>
+            <View style={styles.circuitHeader}>
+              <Text style={styles.circuitLabel}>
+                {currentExercise.exercise_type === 'emom' 
+                  ? `MINUTO ${currentRound}` 
+                  : currentExercise.exercise_type === 'hiit'
+                    ? `RONDA ${currentRound}`
+                    : `EJERCICIO ${currentCircuitIndex + 1}/${circuitExercises.length}`}
+              </Text>
+              {currentExercise.exercise_type === 'amrap' && (
+                <Text style={styles.roundsCount}>{completedRounds} rondas</Text>
+              )}
+            </View>
+
+            <Text style={styles.circuitExerciseName}>
+              {currentCircuitExercise?.name || 'Ejercicio'}
+            </Text>
+
+            {currentCircuitExercise?.reps && (
+              <Text style={styles.circuitReps}>{currentCircuitExercise.reps} reps</Text>
+            )}
+
+            {currentCircuitExercise?.description && (
+              <Text style={styles.circuitDescription}>{currentCircuitExercise.description}</Text>
+            )}
+
+            {currentCircuitExercise?.tips && (
+              <Text style={styles.circuitTips}>{currentCircuitExercise.tips}</Text>
+            )}
+
+            {/* Lista de todos los ejercicios del circuito */}
+            <View style={styles.circuitList}>
+              <Text style={styles.circuitListTitle}>CIRCUITO COMPLETO:</Text>
+              {circuitExercises.map((ex, index) => (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.circuitListItem,
+                    index === currentCircuitIndex && styles.circuitListItemActive
+                  ]}
+                >
+                  <Text style={[
+                    styles.circuitListNumber,
+                    index === currentCircuitIndex && styles.circuitListTextActive
+                  ]}>
+                    {index + 1}.
+                  </Text>
+                  <Text style={[
+                    styles.circuitListName,
+                    index === currentCircuitIndex && styles.circuitListTextActive
+                  ]}>
+                    {ex.name}
+                  </Text>
+                  {ex.reps && (
+                    <Text style={[
+                      styles.circuitListReps,
+                      index === currentCircuitIndex && styles.circuitListTextActive
+                    ]}>
+                      {ex.reps}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {/* Botón para avanzar manualmente en AMRAP */}
+            {currentExercise.exercise_type === 'amrap' && timerActive && (
+              <TouchableOpacity style={styles.nextExerciseButton} onPress={nextCircuitExercise}>
+                <Text style={styles.nextExerciseButtonText}>
+                  {currentCircuitIndex === circuitExercises.length - 1 
+                    ? 'Ronda completada' 
+                    : 'Siguiente ejercicio'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Timer para HIIT/AMRAP/EMOM */}
         {isTimerExercise && (
           <View style={styles.timerSection}>
             <View style={styles.timerDisplay}>
               {currentExercise.exercise_type === 'hiit' && (
                 <>
-                  <Text style={styles.timerPhase}>
+                  <Text style={[styles.timerPhase, isWorkPhase ? styles.timerPhaseWork : styles.timerPhaseRest]}>
                     {isWorkPhase ? 'TRABAJO' : 'DESCANSO'}
                   </Text>
+                  <Text style={styles.timerTime}>
+                    {formatTime(isWorkPhase 
+                      ? currentExercise.hiit_work_time - timerSeconds 
+                      : currentExercise.hiit_rest_time - timerSeconds
+                    )}
+                  </Text>
+                  <Text style={styles.timerRound}>Ronda {currentRound} / {currentExercise.hiit_rounds}</Text>
+                </>
+              )}
+
+              {currentExercise.exercise_type === 'amrap' && (
+                <>
+                  <Text style={styles.timerPhase}>AMRAP</Text>
                   <Text style={styles.timerTime}>{formatTime(timerSeconds)}</Text>
                   <Text style={styles.timerRound}>
-                    Ronda {currentRound} / {currentExercise.hiit_rounds}
+                    de {Math.floor(currentExercise.amrap_duration / 60)} min | {completedRounds} rondas
                   </Text>
                 </>
               )}
 
-              {(currentExercise.exercise_type === 'amrap' || currentExercise.exercise_type === 'emom') && (
+              {currentExercise.exercise_type === 'emom' && (
                 <>
-                  <Text style={styles.timerPhase}>
-                    {currentExercise.exercise_type.toUpperCase()}
-                  </Text>
-                  <Text style={styles.timerTime}>{formatTime(timerSeconds)}</Text>
+                  <Text style={styles.timerPhase}>EMOM</Text>
+                  <Text style={styles.timerTime}>{formatTime(60 - (timerSeconds % 60))}</Text>
                   <Text style={styles.timerRound}>
-                    de {Math.floor((currentExercise.exercise_type === 'amrap' ? currentExercise.amrap_duration : currentExercise.emom_duration) / 60)} min
+                    Minuto {Math.floor(timerSeconds / 60) + 1} / {Math.floor(currentExercise.emom_duration / 60)}
                   </Text>
                 </>
               )}
@@ -490,59 +571,42 @@ export default function TrainingScreen({ route, navigation }) {
 
             <View style={styles.timerControls}>
               {!timerActive ? (
-                <TouchableOpacity
-                  style={[styles.timerButton, styles.timerButtonPrimary]}
-                  onPress={startTimer}
-                >
+                <TouchableOpacity style={[styles.timerButton, styles.timerButtonPrimary]} onPress={startTimer}>
                   <Text style={styles.timerButtonTextPrimary}>
                     {timerSeconds > 0 ? 'Continuar' : 'Iniciar'}
                   </Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
-                  style={[styles.timerButton, styles.timerButtonSecondary]}
-                  onPress={pauseTimer}
-                >
+                <TouchableOpacity style={[styles.timerButton, styles.timerButtonSecondary]} onPress={pauseTimer}>
                   <Text style={styles.timerButtonTextSecondary}>
                     {isPaused ? 'Reanudar' : 'Pausar'}
                   </Text>
                 </TouchableOpacity>
               )}
               
-              <TouchableOpacity
-                style={[styles.timerButton, styles.timerButtonSecondary]}
-                onPress={resetTimer}
-              >
+              <TouchableOpacity style={[styles.timerButton, styles.timerButtonSecondary]} onPress={resetTimer}>
                 <Text style={styles.timerButtonTextSecondary}>Reiniciar</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.completeButton}
-              onPress={handleCompleteExercise}
-            >
+            <TouchableOpacity style={styles.completeButton} onPress={handleCompleteExercise}>
               <Text style={styles.completeButtonText}>
-                {currentExerciseIndex === exercises.length - 1
-                  ? 'Finalizar entrenamiento'
-                  : 'Siguiente ejercicio'}
+                {currentExerciseIndex === exercises.length - 1 ? 'Finalizar' : 'Siguiente ejercicio'}
               </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* EJERCICIO STANDARD */}
+        {/* Ejercicio standard */}
         {currentExercise.exercise_type === 'standard' && (
           <>
-            {/* Timer de descanso */}
             {isResting && (
               <View style={styles.restCard}>
                 <Text style={styles.restTitle}>Descansando</Text>
                 <Text style={styles.restTimer}>{restTimeLeft}s</Text>
                 <View style={styles.restButtons}>
                   <TouchableOpacity style={styles.pauseButton} onPress={togglePause}>
-                    <Text style={styles.pauseButtonText}>
-                      {isPaused ? 'Reanudar' : 'Pausar'}
-                    </Text>
+                    <Text style={styles.pauseButtonText}>{isPaused ? 'Reanudar' : 'Pausar'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.skipButton} onPress={skipRest}>
                     <Text style={styles.skipButtonText}>Saltar</Text>
@@ -551,221 +615,138 @@ export default function TrainingScreen({ route, navigation }) {
               </View>
             )}
 
-            {/* Contador de series */}
-            <View style={styles.counterSection}>
-              <Text style={styles.counterLabel}>Series completadas</Text>
-              <View style={styles.counter}>
-                <TouchableOpacity style={styles.counterButton} onPress={handleRemoveSet}>
+            <View style={styles.setsSection}>
+              <Text style={styles.setsTitle}>Series completadas</Text>
+              <View style={styles.setsCounter}>
+                <TouchableOpacity style={styles.counterButton} onPress={removeSet}>
                   <Text style={styles.counterButtonText}>-</Text>
                 </TouchableOpacity>
-                <Text style={styles.counterValue}>
-                  {completedSets} / {currentExercise.sets}
-                </Text>
-                <TouchableOpacity style={styles.counterButton} onPress={handleAddSet}>
+                <Text style={styles.setsValue}>{completedSets} / {currentExercise.sets}</Text>
+                <TouchableOpacity style={styles.counterButton} onPress={addSet}>
                   <Text style={styles.counterButtonText}>+</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Contador de reps */}
-            <View style={styles.counterSection}>
-              <Text style={styles.counterLabel}>Repeticiones totales (opcional)</Text>
-              <View style={styles.counter}>
-                <TouchableOpacity style={styles.counterButton} onPress={handleRemoveRep}>
-                  <Text style={styles.counterButtonText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.counterValue}>{completedReps}</Text>
-                <TouchableOpacity style={styles.counterButton} onPress={handleAddRep}>
-                  <Text style={styles.counterButtonText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Botones de acción */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[styles.restTimerButton, isResting && styles.restTimerButtonDisabled]}
-                onPress={startRestTimer}
-                disabled={isResting}
-              >
-                <Text style={styles.restTimerButtonText}>Iniciar descanso</Text>
-              </TouchableOpacity>
-
-              {exerciseLogged && currentExerciseIndex < exercises.length - 1 ? (
-                <TouchableOpacity style={styles.nextButton} onPress={goToNextExercise}>
-                  <Text style={styles.nextButtonText}>Siguiente ejercicio</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.completeButton} onPress={handleCompleteExercise}>
-                  <Text style={styles.completeButtonText}>
-                    {currentExerciseIndex === exercises.length - 1
-                      ? 'Finalizar entrenamiento'
-                      : 'Completar ejercicio'}
-                  </Text>
+              
+              {completedSets > 0 && completedSets < currentExercise.sets && !isResting && (
+                <TouchableOpacity style={styles.restButton} onPress={startRestTimer}>
+                  <Text style={styles.restButtonText}>Descanso ({currentExercise.rest_time}s)</Text>
                 </TouchableOpacity>
               )}
             </View>
+
+            <TouchableOpacity
+              style={[styles.completeButton, completedSets === 0 && styles.completeButtonDisabled]}
+              onPress={handleCompleteExercise}
+              disabled={completedSets === 0}
+            >
+              <Text style={styles.completeButtonText}>
+                {currentExerciseIndex === exercises.length - 1 ? 'Finalizar' : 'Siguiente'}
+              </Text>
+            </TouchableOpacity>
           </>
         )}
-
-        {/* Lista de ejercicios restantes */}
-        <View style={styles.upcomingSection}>
-          <Text style={styles.upcomingTitle}>Próximos ejercicios</Text>
-          {exercises.slice(currentExerciseIndex + 1).length === 0 ? (
-            <Text style={styles.emptyText}>¡Este es el último ejercicio!</Text>
-          ) : (
-            exercises.slice(currentExerciseIndex + 1).map((ex, idx) => (
-              <View key={ex.id} style={styles.upcomingItem}>
-                <Text style={styles.upcomingNumber}>{currentExerciseIndex + idx + 2}.</Text>
-                <Text style={styles.upcomingName}>{ex.name}</Text>
-                <Text style={styles.upcomingDetail}>
-                  {ex.exercise_type === 'hiit'
-                    ? `HIIT ${ex.hiit_rounds}r`
-                    : ex.exercise_type === 'amrap'
-                    ? `AMRAP ${Math.floor(ex.amrap_duration / 60)}m`
-                    : ex.exercise_type === 'emom'
-                    ? `EMOM ${Math.floor(ex.emom_duration / 60)}m`
-                    : `${ex.sets}×${ex.reps}`}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
+  container: { flex: 1, backgroundColor: '#000000' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
   },
-  progressText: {
-    fontSize: 14,
-    color: '#888888',
-    fontWeight: '600',
-  },
-  quitButton: {
-    fontSize: 14,
-    color: '#666666',
-    fontWeight: '600',
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 24,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 2,
-  },
-  spotifySection: {
-    marginBottom: 24,
-  },
-  spotifyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  spotifyCard: {
-    backgroundColor: '#0a0a0a',
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 12,
-    width: 160,
-  },
-  spotifyName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  spotifyTracks: {
-    fontSize: 11,
-    color: '#666666',
-  },
+  quitText: { color: '#666666', fontSize: 16 },
+  headerTitle: { color: '#ffffff', fontSize: 17, fontWeight: '600' },
+  progress: { color: '#666666', fontSize: 14, fontWeight: '600' },
+  content: { flex: 1 },
+  contentContainer: { padding: 20 },
+  
   exerciseCard: {
     backgroundColor: '#0a0a0a',
+    borderRadius: 16,
     padding: 20,
-    borderRadius: 12,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#1a1a1a',
+  },
+  exerciseName: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginBottom: 12 },
+  descriptionScroll: { maxHeight: 100, marginBottom: 12 },
+  exerciseDescription: { fontSize: 14, color: '#888888', lineHeight: 20 },
+  exerciseNotes: { fontSize: 13, color: '#666666', fontStyle: 'italic', marginTop: 8 },
+  targetRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  targetLabel: { fontSize: 14, color: '#888888', marginRight: 8 },
+  targetValue: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  hiitInfo: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  metaText: { fontSize: 13, color: '#888888', fontWeight: '600' },
+
+  // ══════════════════════════════════════════════════════════════
+  // NUEVOS ESTILOS PARA CIRCUIT_EXERCISES
+  // ══════════════════════════════════════════════════════════════
+  circuitCard: {
+    backgroundColor: '#0f0f0f',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
-  exerciseName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  exerciseDescription: {
-    fontSize: 14,
-    color: '#888888',
-    marginBottom: 16,
-  },
-  targetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  targetLabel: {
-    fontSize: 14,
-    color: '#888888',
-    marginRight: 8,
-  },
-  targetValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  restInfo: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  hiitInfo: {
+  circuitHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  metaText: {
-    fontSize: 13,
-    color: '#888888',
-    fontWeight: '600',
-  },
-  loggedBadge: {
-    marginTop: 12,
+  circuitLabel: { fontSize: 12, fontWeight: '700', color: '#666666', letterSpacing: 1 },
+  roundsCount: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+  circuitExerciseName: { fontSize: 32, fontWeight: '800', color: '#ffffff', marginBottom: 8 },
+  circuitReps: { fontSize: 24, fontWeight: '700', color: '#888888', marginBottom: 12 },
+  circuitDescription: { fontSize: 14, color: '#666666', lineHeight: 20, marginBottom: 8 },
+  circuitTips: { fontSize: 13, color: '#888888', fontStyle: 'italic', marginBottom: 16 },
+  
+  circuitList: {
     backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+  },
+  circuitListTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#666666',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  circuitListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    borderRadius: 8,
+    marginBottom: 4,
   },
-  loggedBadgeText: {
-    color: '#888888',
-    fontSize: 12,
-    fontWeight: '600',
+  circuitListItemActive: { backgroundColor: '#ffffff' },
+  circuitListNumber: { fontSize: 14, fontWeight: '600', color: '#666666', width: 24 },
+  circuitListName: { flex: 1, fontSize: 14, color: '#888888' },
+  circuitListReps: { fontSize: 13, color: '#666666' },
+  circuitListTextActive: { color: '#000000', fontWeight: '600' },
+  
+  nextExerciseButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
   },
-  timerSection: {
-    marginBottom: 20,
-  },
+  nextExerciseButtonText: { fontSize: 15, fontWeight: '600', color: '#000000' },
+
+  // Timer
+  timerSection: { marginBottom: 20 },
   timerDisplay: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
@@ -773,218 +754,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  timerPhase: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#888888',
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  timerTime: {
-    fontSize: 56,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: -2,
-  },
-  timerRound: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 8,
-  },
-  timerControls: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  timerButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  timerButtonPrimary: {
-    backgroundColor: '#ffffff',
-  },
-  timerButtonSecondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  timerButtonTextPrimary: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  timerButtonTextSecondary: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  restCard: {
-    backgroundColor: '#1a1a1a',
-    padding: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  restTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  restTimer: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  restButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  pauseButton: {
-    backgroundColor: '#333333',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  pauseButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  skipButton: {
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  skipButtonText: {
-    color: '#888888',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  counterSection: {
-    marginBottom: 20,
-  },
-  counterLabel: {
-    fontSize: 13,
-    color: '#888888',
-    marginBottom: 8,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  counter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
-  },
-  counterButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  counterButtonText: {
-    fontSize: 24,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  counterValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginHorizontal: 32,
-    minWidth: 80,
-    textAlign: 'center',
-  },
-  actionButtons: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  restTimerButton: {
-    backgroundColor: '#1a1a1a',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  restTimerButtonDisabled: {
-    backgroundColor: '#0a0a0a',
-    opacity: 0.5,
-  },
-  restTimerButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  completeButton: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  completeButtonText: {
-    color: '#000000',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  nextButton: {
-    backgroundColor: '#333333',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  upcomingSection: {
-    marginTop: 8,
-  },
-  upcomingTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888888',
-    marginBottom: 12,
-  },
-  upcomingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-  },
-  upcomingNumber: {
-    fontSize: 13,
-    color: '#666666',
-    width: 24,
-  },
-  upcomingName: {
-    flex: 1,
-    fontSize: 14,
-    color: '#888888',
-  },
-  upcomingDetail: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    marginTop: 40,
-  },
+  timerPhase: { fontSize: 12, fontWeight: '700', color: '#888888', letterSpacing: 1, marginBottom: 12 },
+  timerPhaseWork: { color: '#ffffff' },
+  timerPhaseRest: { color: '#666666' },
+  timerTime: { fontSize: 56, fontWeight: '700', color: '#ffffff' },
+  timerRound: { fontSize: 14, color: '#666666', marginTop: 8 },
+  timerControls: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  timerButton: { flex: 1, paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
+  timerButtonPrimary: { backgroundColor: '#ffffff' },
+  timerButtonSecondary: { backgroundColor: '#1a1a1a' },
+  timerButtonTextPrimary: { fontSize: 15, fontWeight: '600', color: '#000000' },
+  timerButtonTextSecondary: { fontSize: 15, fontWeight: '600', color: '#ffffff' },
+  
+  completeButton: { backgroundColor: '#ffffff', paddingVertical: 16, borderRadius: 8, alignItems: 'center' },
+  completeButtonDisabled: { backgroundColor: '#333333' },
+  completeButtonText: { fontSize: 16, fontWeight: '600', color: '#000000' },
+
+  // Rest & Sets
+  restCard: { backgroundColor: '#1a1a1a', borderRadius: 12, padding: 24, alignItems: 'center', marginBottom: 20 },
+  restTitle: { fontSize: 14, color: '#888888', fontWeight: '600', marginBottom: 8 },
+  restTimer: { fontSize: 48, fontWeight: '700', color: '#ffffff', marginBottom: 16 },
+  restButtons: { flexDirection: 'row', gap: 12 },
+  pauseButton: { backgroundColor: '#2a2a2a', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+  pauseButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  skipButton: { backgroundColor: '#333333', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+  skipButtonText: { color: '#888888', fontSize: 14, fontWeight: '600' },
+  
+  setsSection: { alignItems: 'center', marginBottom: 20 },
+  setsTitle: { fontSize: 14, color: '#888888', fontWeight: '600', marginBottom: 16 },
+  setsCounter: { flexDirection: 'row', alignItems: 'center', gap: 24, marginBottom: 16 },
+  counterButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' },
+  counterButtonText: { fontSize: 24, fontWeight: '600', color: '#ffffff' },
+  setsValue: { fontSize: 32, fontWeight: '700', color: '#ffffff', minWidth: 80, textAlign: 'center' },
+  restButton: { backgroundColor: '#1a1a1a', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+  restButtonText: { color: '#888888', fontSize: 14, fontWeight: '600' },
+  
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyText: { fontSize: 16, color: '#888888', textAlign: 'center', marginBottom: 20 },
+  backButton: { backgroundColor: '#ffffff', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+  backButtonText: { fontSize: 15, fontWeight: '600', color: '#000000' },
 });
