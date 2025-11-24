@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getTodayFood, logFood, deleteFood, analyzeFood } from '../api/food';
+import KeyboardView from '../components/KeyboardView';
+
 
 const MEAL_TYPES = [
   { key: 'breakfast', label: '🌅 Desayuno' },
@@ -446,105 +448,110 @@ export default function FoodScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* ==================== MODAL MANUAL (existente) ==================== */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setModalVisible(false)}
+{/* ==================== MODAL MANUAL ==================== */}
+<Modal
+  visible={modalVisible}
+  animationType="slide"
+  presentationStyle="pageSheet"
+  onRequestClose={() => setModalVisible(false)}
+>
+  <SafeAreaView style={styles.modalContainer}>
+    <KeyboardView>
+      <ScrollView 
+        contentContainerStyle={styles.modalContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelButton}>Cancelar</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Agregar comida</Text>
-              <TouchableOpacity onPress={handleSaveFood} disabled={saving}>
-                <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
-                  {saving ? '...' : 'Guardar'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={() => setModalVisible(false)}>
+            <Text style={styles.cancelButton}>Cancelar</Text>
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Agregar comida</Text>
+          <TouchableOpacity onPress={handleSaveFood} disabled={saving}>
+            <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
+              {saving ? '...' : 'Guardar'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* Tipo de comida */}
-            <Text style={styles.label}>Tipo de comida</Text>
-            <View style={styles.mealTypeRow}>
-              {MEAL_TYPES.map((meal) => (
-                <TouchableOpacity
-                  key={meal.key}
-                  style={[
-                    styles.mealTypeButton,
-                    mealType === meal.key && styles.mealTypeButtonActive,
-                  ]}
-                  onPress={() => setMealType(meal.key)}
-                >
-                  <Text style={styles.mealTypeText}>{meal.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        {/* Tipo de comida */}
+        <Text style={styles.label}>Tipo de comida</Text>
+        <View style={styles.mealTypeRow}>
+          {MEAL_TYPES.map((meal) => (
+            <TouchableOpacity
+              key={meal.key}
+              style={[
+                styles.mealTypeButton,
+                mealType === meal.key && styles.mealTypeButtonActive,
+              ]}
+              onPress={() => setMealType(meal.key)}
+            >
+              <Text style={styles.mealTypeText}>{meal.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-            {/* Nombre */}
-            <Text style={styles.label}>¿Qué comiste?</Text>
+        {/* Nombre */}
+        <Text style={styles.label}>¿Qué comiste?</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: Pollo con arroz"
+          placeholderTextColor="#6b7280"
+          value={name}
+          onChangeText={setName}
+        />
+
+        {/* Calorías */}
+        <Text style={styles.label}>Calorías (kcal)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: 450"
+          placeholderTextColor="#6b7280"
+          keyboardType="number-pad"
+          value={calories}
+          onChangeText={setCalories}
+        />
+
+        {/* Macros */}
+        <Text style={styles.label}>Macros (opcional)</Text>
+        <View style={styles.macrosRow}>
+          <View style={styles.macroField}>
+            <Text style={styles.macroLabel}>Proteína (g)</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Ej: Pollo con arroz"
-              placeholderTextColor="#6b7280"
-              value={name}
-              onChangeText={setName}
-            />
-
-            {/* Calorías */}
-            <Text style={styles.label}>Calorías (kcal)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej: 450"
+              style={styles.macroInput}
+              placeholder="0"
               placeholderTextColor="#6b7280"
               keyboardType="number-pad"
-              value={calories}
-              onChangeText={setCalories}
+              value={protein}
+              onChangeText={setProtein}
             />
-
-            {/* Macros */}
-            <Text style={styles.label}>Macros (opcional)</Text>
-            <View style={styles.macrosRow}>
-              <View style={styles.macroField}>
-                <Text style={styles.macroLabel}>Proteína (g)</Text>
-                <TextInput
-                  style={styles.macroInput}
-                  placeholder="0"
-                  placeholderTextColor="#6b7280"
-                  keyboardType="number-pad"
-                  value={protein}
-                  onChangeText={setProtein}
-                />
-              </View>
-              <View style={styles.macroField}>
-                <Text style={styles.macroLabel}>Carbs (g)</Text>
-                <TextInput
-                  style={styles.macroInput}
-                  placeholder="0"
-                  placeholderTextColor="#6b7280"
-                  keyboardType="number-pad"
-                  value={carbs}
-                  onChangeText={setCarbs}
-                />
-              </View>
-              <View style={styles.macroField}>
-                <Text style={styles.macroLabel}>Grasa (g)</Text>
-                <TextInput
-                  style={styles.macroInput}
-                  placeholder="0"
-                  placeholderTextColor="#6b7280"
-                  keyboardType="number-pad"
-                  value={fat}
-                  onChangeText={setFat}
-                />
-              </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+          </View>
+          <View style={styles.macroField}>
+            <Text style={styles.macroLabel}>Carbs (g)</Text>
+            <TextInput
+              style={styles.macroInput}
+              placeholder="0"
+              placeholderTextColor="#6b7280"
+              keyboardType="number-pad"
+              value={carbs}
+              onChangeText={setCarbs}
+            />
+          </View>
+          <View style={styles.macroField}>
+            <Text style={styles.macroLabel}>Grasa (g)</Text>
+            <TextInput
+              style={styles.macroInput}
+              placeholder="0"
+              placeholderTextColor="#6b7280"
+              keyboardType="number-pad"
+              value={fat}
+              onChangeText={setFat}
+            />
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardView>
+  </SafeAreaView>
+</Modal>
     </SafeAreaView>
   );
 }

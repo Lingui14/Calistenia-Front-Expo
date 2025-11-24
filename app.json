@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CalisteniaApp",
+    "name": "CalistenIA",
     "slug": "CalisteniaApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,23 +10,41 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.calistenia.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.calistenia.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite acceso a fotos para escanear alimentos",
+          "cameraPermission": "Permite acceso a la cámara para escanear alimentos"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7c5be9a2-8306-4fc8-915d-53e0f97bac92"
+      }
+    }
   }
 }

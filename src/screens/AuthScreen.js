@@ -8,11 +8,11 @@ import {
   Alert,
   SafeAreaView,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { authStyles } from '../styles/authStyles';
+import KeyboardView from '../components/KeyboardView';
 
 export default function AuthScreen({ onLogin, onRegister }) {
   const [mode, setMode] = useState('login');
@@ -72,9 +72,8 @@ export default function AuthScreen({ onLogin, onRegister }) {
 
   return (
     <SafeAreaView style={authStyles.authContainer}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+      <KeyboardView 
+        style={StyleSheet.KeyboardView}
       >
         <ScrollView 
           contentContainerStyle={authStyles.authScrollContent}
@@ -213,7 +212,7 @@ export default function AuthScreen({ onLogin, onRegister }) {
             </Text>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
     </SafeAreaView>
   );
 }

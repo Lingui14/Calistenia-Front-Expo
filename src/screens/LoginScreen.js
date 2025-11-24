@@ -9,12 +9,11 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { login, register } from '../api/auth';
+import KeyboardView from '../components/KeyboardView';
 
 export default function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState('login');
@@ -49,8 +48,7 @@ export default function LoginScreen({ onLogin }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardView 
         style={styles.keyboardView}
       >
         <ScrollView 
@@ -148,7 +146,7 @@ export default function LoginScreen({ onLogin }) {
             Entrena inteligente, progresa constante
           </Text>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
     </SafeAreaView>
   );
 }

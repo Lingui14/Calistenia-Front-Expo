@@ -309,14 +309,19 @@ export default function RutinaScreen({
                     </Text>
                     <Text style={{ color: '#737373', fontSize: 13 }}>
                       {ex.exercise_type === 'amrap'
-                        ? `AMRAP ${Math.floor(ex.amrap_duration / 60)} min`
-                        : ex.exercise_type === 'hiit'
-                        ? `HIIT ${ex.hiit_work_time}s/${ex.hiit_rest_time}s × ${ex.hiit_rounds}`
-                        : ex.exercise_type === 'emom'
-                        ? `EMOM ${Math.floor(ex.emom_duration / 60)} min`
-                        : `${ex.sets} × ${ex.reps} reps`}
+                      ? `AMRAP ${Math.floor(ex.amrap_duration / 60)} min`
+                      : ex.exercise_type === 'hiit'
+                      ? `HIIT ${ex.hiit_work_time}s/${ex.hiit_rest_time}s × ${ex.hiit_rounds}`
+                      : ex.exercise_type === 'emom'
+                      ? `EMOM ${Math.floor(ex.emom_duration / 60)} min`
+                      : `${ex.sets || 3} × ${ex.reps || 10} reps`}
+                  </Text>
+                  {ex.description ? (
+                    <Text style={{ color: '#525252', fontSize: 12, marginTop: 4 }} numberOfLines={2}>
+                      {ex.description}
                     </Text>
-                  </View>
+                  ) : null}
+                </View>
                 </View>
               ))}
               {localRoutine.Exercises?.length > 6 && (

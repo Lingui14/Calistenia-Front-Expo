@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,26 +6,51 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { sendMessage } from '../api/chat';
 import { chatStyles } from '../styles/chatStyles';
+import KeyboardView from '../components/KeyboardView';
 
 export default function ChatScreen({ onRoutineGenerated }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef(null);
   const navigation = useNavigation();
+
+  // Listener para el teclado (especialmente útil en Android)
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   async function handleSend() {
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
     setInput('');
+    Keyboard.dismiss();
     
     const newMessages = [...messages, { role: 'user', content: userMessage }];
     setMessages(newMessages);
@@ -74,86 +99,93 @@ export default function ChatScreen({ onRoutineGenerated }) {
 
   return (
     <SafeAreaView style={chatStyles.container}>
-      <View style={chatStyles.header}>
-        <Text style={chatStyles.title}>CalistenIA</Text>
-        <Text style={chatStyles.subtitle}>Tu coach personal de calistenia</Text>
-      </View>
-
-      <ScrollView 
-        style={chatStyles.messagesContainer}
-        contentContainerStyle={chatStyles.messagesContent}
-        ref={scrollViewRef}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      <KeyboardView 
+        style={{ flex: 1 }}
+        offset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {messages.length === 0 ? (
-          <View style={chatStyles.emptyChat}>
-            <Text style={chatStyles.emptyChatText}>
-              Soy tu asistente de calistenia.{'\n\n'}
-              Pregúntame sobre ejercicios, rutinas, técnica, nutrición o lo que necesites.
-            </Text>
-            <View style={chatStyles.suggestions}>
-              <TouchableOpacity 
-                style={chatStyles.suggestionChip}
-                onPress={() => setInput('¿Cómo hago mi primera dominada?')}
-              >
-                <Text style={chatStyles.suggestionText}>¿Cómo hago mi primera dominada?</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={chatStyles.suggestionChip}
-                onPress={() => setInput('Genera una rutina HIIT de 30 minutos')}
-              >
-                <Text style={chatStyles.suggestionText}>Rutina HIIT 30 min</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={chatStyles.suggestionChip}
-                onPress={() => setInput('¿Qué debo comer para ganar músculo?')}
-              >
-                <Text style={chatStyles.suggestionText}>Nutrición para ganar músculo</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          messages.map((msg, index) => (
-            <View key={index}>
-              <View
-                style={[
-                  chatStyles.messageBubble,
-                  msg.role === 'user' ? chatStyles.userBubble : chatStyles.aiBubble,
-                ]}
-              >
-                <Text style={[
-                  chatStyles.messageText,
-                  msg.role === 'user' ? chatStyles.userText : chatStyles.aiText,
-                ]}>
-                  {msg.content}
-                </Text>
-              </View>
-              
-              {msg.role === 'assistant' && msg.hasRoutine && (
-                <TouchableOpacity
-                  style={chatStyles.routineButton}
-                  onPress={handleGoToRoutine}
+        <View style={chatStyles.header}>
+          <Text style={chatStyles.title}>CalistenIA</Text>
+          <Text style={chatStyles.subtitle}>Tu coach personal de calistenia</Text>
+        </View>
+
+        <ScrollView 
+          style={chatStyles.messagesContainer}
+          contentContainerStyle={[
+            chatStyles.messagesContent,
+            Platform.OS === 'android' && { paddingBottom: keyboardHeight > 0 ? 20 : 32 }
+          ]}
+          ref={scrollViewRef}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          keyboardShouldPersistTaps="handled"
+        >
+          {messages.length === 0 ? (
+            <View style={chatStyles.emptyChat}>
+              <Text style={chatStyles.emptyChatText}>
+                Soy tu asistente de calistenia.{'\n\n'}
+                Pregúntame sobre ejercicios, rutinas, técnica, nutrición o lo que necesites.
+              </Text>
+              <View style={chatStyles.suggestions}>
+                <TouchableOpacity 
+                  style={chatStyles.suggestionChip}
+                  onPress={() => setInput('¿Cómo hago mi primera dominada?')}
                 >
-                  <Text style={chatStyles.routineButtonText}>Ver rutina generada</Text>
-                  <Text style={chatStyles.routineButtonArrow}>→</Text>
+                  <Text style={chatStyles.suggestionText}>¿Cómo hago mi primera dominada?</Text>
                 </TouchableOpacity>
-              )}
+                <TouchableOpacity 
+                  style={chatStyles.suggestionChip}
+                  onPress={() => setInput('Genera una rutina HIIT de 30 minutos')}
+                >
+                  <Text style={chatStyles.suggestionText}>Rutina HIIT 30 min</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={chatStyles.suggestionChip}
+                  onPress={() => setInput('¿Qué debo comer para ganar músculo?')}
+                >
+                  <Text style={chatStyles.suggestionText}>Nutrición para ganar músculo</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          ))
-        )}
-        {loading && (
-          <View style={[chatStyles.messageBubble, chatStyles.aiBubble, { flexDirection: 'row' }]}>
-            <ActivityIndicator size="small" color="#ffffff" />
-            <Text style={[chatStyles.aiText, { marginLeft: 8 }]}>Pensando...</Text>
-          </View>
-        )}
-      </ScrollView>
+          ) : (
+            messages.map((msg, index) => (
+              <View key={index}>
+                <View
+                  style={[
+                    chatStyles.messageBubble,
+                    msg.role === 'user' ? chatStyles.userBubble : chatStyles.aiBubble,
+                  ]}
+                >
+                  <Text style={[
+                    chatStyles.messageText,
+                    msg.role === 'user' ? chatStyles.userText : chatStyles.aiText,
+                  ]}>
+                    {msg.content}
+                  </Text>
+                </View>
+                
+                {msg.role === 'assistant' && msg.hasRoutine && (
+                  <TouchableOpacity
+                    style={chatStyles.routineButton}
+                    onPress={handleGoToRoutine}
+                  >
+                    <Text style={chatStyles.routineButtonText}>Ver rutina generada</Text>
+                    <Text style={chatStyles.routineButtonArrow}>→</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))
+          )}
+          {loading && (
+            <View style={[chatStyles.messageBubble, chatStyles.aiBubble, { flexDirection: 'row' }]}>
+              <ActivityIndicator size="small" color="#ffffff" />
+              <Text style={[chatStyles.aiText, { marginLeft: 8 }]}>Pensando...</Text>
+            </View>
+          )}
+        </ScrollView>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={90}
-      >
-        <View style={chatStyles.inputContainer}>
+        <View style={[
+          chatStyles.inputContainer,
+          Platform.OS === 'android' && keyboardHeight > 0 && { paddingBottom: 16 }
+        ]}>
           <TextInput
             style={chatStyles.input}
             placeholder="Escribe tu pregunta..."
@@ -162,6 +194,7 @@ export default function ChatScreen({ onRoutineGenerated }) {
             onChangeText={setInput}
             multiline
             maxLength={500}
+            onFocus={() => setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300)}
           />
           <TouchableOpacity 
             style={[chatStyles.sendButton, (!input.trim() || loading) && chatStyles.sendButtonDisabled]}
@@ -171,7 +204,7 @@ export default function ChatScreen({ onRoutineGenerated }) {
             <Text style={chatStyles.sendButtonText}>→</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardView>
     </SafeAreaView>
   );
 }
