@@ -347,27 +347,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-```
-
----
-
-## Configuración en Spotify Developer Dashboard
-
-1. Ve a https://developer.spotify.com/dashboard
-2. Selecciona tu app (o crea una nueva)
-3. Click en "Settings" o "Edit Settings"
-4. En **Redirect URIs**, agrega exactamente:
-```
-   calistenia://spotify-callback
-```
-5. Guarda los cambios
-
----
-
-## Variables de entorno en Railway
-
-Asegúrate de tener estas variables en tu backend de Railway:
-```
-SPOTIFY_CLIENT_ID=tu_client_id_de_spotify
-SPOTIFY_CLIENT_SECRET=tu_client_secret_de_spotify
-SPOTIFY_REDIRECT_URI=calistenia://spotify-callback
