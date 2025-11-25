@@ -55,12 +55,16 @@ export default function RutinaScreen({
     }
   }
 
-  async function handleGenerateAI() {
-    try {
-      setLoadingAI(true);
-      
-      const res = await api.post('/api/routines/generate-ai', {});
-      
+ async function handleGenerateAI() {
+  try {
+    setLoadingAI(true);
+    console.log('🚀 RutinaScreen: Llamando a /api/routines/generate-ai...');
+    
+    const res = await api.post('/api/routines/generate-ai', {});
+    
+    console.log('✅ Respuesta:', res.data);
+    
+    if (res.data.routine) {
       setLocalRoutine(res.data.routine);
       
       if (onGetActiveRoutine) {
@@ -82,13 +86,24 @@ export default function RutinaScreen({
           }
         ]
       );
-    } catch (err) {
-      console.error('Error generando rutina:', err);
-      Alert.alert('Error', 'No se pudo generar la rutina con IA. Verifica tu conexión.');
-    } finally {
-      setLoadingAI(false);
+    } else {
+      throw new Error('No se recibió rutina en la respuesta');
     }
+  } catch (err) {
+    console.error('❌ Error generando rutina:', err);
+    console.error('❌ Response data:', err.response?.data);
+    console.error('❌ Status:', err.response?.status);
+    
+    const errorMessage = err.response?.data?.message 
+      || err.response?.data?.error 
+      || err.message 
+      || 'Error desconocido';
+    
+    Alert.alert('Error', `No se pudo generar la rutina: ${errorMessage}`);
+  } finally {
+    setLoadingAI(false);
   }
+}
 
   function handleStartTraining() {
     if (!localRoutine) {

@@ -13,6 +13,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getMyRoutines, createRoutine, deleteRoutine } from '../api/routines';
 import api from '../api/client';
 
@@ -41,9 +42,12 @@ export default function ExercisesScreen({ navigation }) {
   ]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadRoutines();
-  }, []);
+  // Cargar rutinas cada vez que la pantalla recibe focus
+  useFocusEffect(
+    useCallback(() => {
+      loadRoutines();
+    }, [])
+  );
 
   async function loadRoutines() {
     try {
@@ -72,21 +76,37 @@ export default function ExercisesScreen({ navigation }) {
   async function handleGenerateWithAI() {
     try {
       setLoadingAI(true);
+      console.log('Llamando a /api/routines/generate-ai...');
+      
       const res = await api.post('/api/routines/generate-ai', {});
       
-      loadRoutines();
+      console.log('Respuesta:', res.data);
       
-      Alert.alert(
-        'Rutina creada',
-        `"${res.data.routine.name}" fue generada con IA y agregada a tus rutinas`
-      );
+      if (res.data.routine) {
+        await loadRoutines();
+        Alert.alert(
+          'Rutina creada',
+          `"${res.data.routine.name}" fue generada con IA y agregada a tus rutinas`
+        );
+      } else {
+        throw new Error('No se recibió rutina en la respuesta');
+      }
     } catch (err) {
-      console.error('Error:', err);
-      Alert.alert('Error', 'No se pudo generar la rutina con IA');
+      console.error('Error completo:', err);
+      console.error('Response data:', err.response?.data);
+      
+      const errorMessage = err.response?.data?.message 
+        || err.response?.data?.error 
+        || err.message 
+        || 'Error desconocido';
+      
+      Alert.alert('Error', `No se pudo generar la rutina: ${errorMessage}`);
     } finally {
       setLoadingAI(false);
     }
   }
+
+  // ... resto del código igual
 
   function openModal() {
     setRoutineName('');

@@ -6,7 +6,14 @@ export async function sendMessage(userMessage, conversationHistory = []) {
     { role: 'user', content: userMessage },
   ];
 
-  const res = await api.post('/api/chat', { messages });
+  console.log('Enviando a /api/chat:', { messages });
 
-  return res.data.choices?.[0]?.message?.content || 'No pude generar una respuesta.';
+  try {
+    const res = await api.post('/api/chat', { messages });
+    console.log('Respuesta del chat:', res.data);
+    return res.data.choices?.[0]?.message?.content || 'No pude generar una respuesta.';
+  } catch (err) {
+    console.error('Error en sendMessage:', err.response?.data || err.message);
+    throw err;
+  }
 }
