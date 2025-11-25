@@ -106,8 +106,6 @@ export default function ExercisesScreen({ navigation }) {
     }
   }
 
-  // ... resto del código igual
-
   function openModal() {
     setRoutineName('');
     setRoutineDescription('');
