@@ -1,5 +1,5 @@
 // src/screens/SpotifyAuthScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,15 +19,13 @@ export default function SpotifyAuthScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [processingCode, setProcessingCode] = useState(false);
+  const processingRef = useRef(false); // USAR REF
 
   useEffect(() => {
     checkSpotifyStatus();
     
-    // Listener para deep link
     const subscription = Linking.addEventListener('url', handleDeepLink);
     
-    // Verificar si la app se abrió con un deep link
     Linking.getInitialURL().then((url) => {
       if (url && url.includes('spotify-callback')) {
         handleDeepLink({ url });
@@ -50,28 +48,26 @@ export default function SpotifyAuthScreen({ navigation }) {
     }
   }
 
-  async function handleDeepLink(event) {
+ async function handleDeepLink(event) {
     const { url } = event;
     console.log('Deep link recibido:', url);
     
+    // Si ya estamos procesando, ignorar
+    if (processingRef.current) {
+      console.log('Ya procesando, ignorando deep link');
+      return;
+    }
+    
     if (url && url.includes('spotify-callback')) {
-      // Extraer el código de la URL
       let code = null;
       
-      // Intentar diferentes formatos de URL
       if (url.includes('code=')) {
         code = url.split('code=')[1]?.split('&')[0]?.split('#')[0];
       }
       
       if (code) {
-        console.log('Código de Spotify recibido');
+        console.log('Código de Spotify recibido via deep link');
         await handleSpotifyCallback(code);
-      } else {
-        // Verificar si hay error
-        const error = url.split('error=')[1]?.split('&')[0];
-        if (error) {
-          Alert.alert('Error', 'No se pudo autorizar Spotify: ' + decodeURIComponent(error));
-        }
       }
     }
   }
@@ -79,8 +75,8 @@ export default function SpotifyAuthScreen({ navigation }) {
   async function handleConnectSpotify() {
     try {
       setLoading(true);
+      processingRef.current = false; // Reset al iniciar
       
-      // Obtener URL de autorización
       const res = await api.get('/api/spotify/auth-url');
       const authUrl = res.data.url;
       
@@ -90,13 +86,18 @@ export default function SpotifyAuthScreen({ navigation }) {
       
       console.log('Abriendo Spotify OAuth...');
       
-      // Abrir navegador para OAuth
       const result = await WebBrowser.openAuthSessionAsync(
         authUrl,
         'calistenia://spotify-callback'
       );
       
       console.log('Resultado WebBrowser:', result.type);
+      
+      // Si ya se procesó via deep link, no hacer nada
+      if (processingRef.current) {
+        console.log('Código ya procesado via deep link');
+        return;
+      }
       
       if (result.type === 'success' && result.url) {
         let code = null;
@@ -107,29 +108,26 @@ export default function SpotifyAuthScreen({ navigation }) {
         
         if (code) {
           await handleSpotifyCallback(code);
-        } else {
-          console.log('No se encontró código en URL:', result.url);
         }
-      } else if (result.type === 'cancel') {
-        console.log('Usuario canceló la autorización');
       }
     } catch (err) {
       console.error('Error conectando Spotify:', err);
-      Alert.alert('Error', 'No se pudo conectar con Spotify. Verifica tu conexión.');
+      Alert.alert('Error', 'No se pudo conectar con Spotify.');
     } finally {
       setLoading(false);
     }
   }
 
- async function handleSpotifyCallback(code) {
-    // Evitar doble envío
-    if (processingCode) {
-      console.log('Ya se está procesando un código, ignorando...');
+  async function handleSpotifyCallback(code) {
+    // Verificar con ref (más inmediato que state)
+    if (processingRef.current) {
+      console.log('Código ya siendo procesado, ignorando...');
       return;
     }
     
+    processingRef.current = true; // Bloquear inmediatamente
+    
     try {
-      setProcessingCode(true); // NUEVO
       setLoading(true);
       console.log('Enviando código al backend...');
       
@@ -142,18 +140,13 @@ export default function SpotifyAuthScreen({ navigation }) {
           'Spotify conectado exitosamente.',
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
-      } else {
-        throw new Error('Error en la respuesta del servidor');
       }
     } catch (err) {
       console.error('Error en callback:', err);
-      // Solo mostrar error si no es por código ya usado
-      if (!err.message?.includes('invalid_grant')) {
-        Alert.alert('Error', 'No se pudo completar la conexión con Spotify');
-      }
+      Alert.alert('Error', 'No se pudo completar la conexión con Spotify');
+      processingRef.current = false; // Reset solo si hay error para permitir reintento
     } finally {
       setLoading(false);
-      // No resetear processingCode para evitar reintentos
     }
   }
 
