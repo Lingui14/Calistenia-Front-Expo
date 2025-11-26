@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // URL de producción en Railway
-export const API_BASE_URL = 'https://calistenia-backend-production.up.railway.app';
+export const API_BASE_URL = 'https://calistenia-backend-production-6e8f.up.railway.app';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
