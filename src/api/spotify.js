@@ -1,4 +1,4 @@
-// src/api/spotify.js (NUEVO)
+// src/api/spotify.js
 import api from './client';
 import { Linking } from 'react-native';
 

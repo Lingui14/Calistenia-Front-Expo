@@ -19,6 +19,7 @@ export default function SpotifyAuthScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [processingCode, setProcessingCode] = useState(false);
 
   useEffect(() => {
     checkSpotifyStatus();
@@ -120,8 +121,15 @@ export default function SpotifyAuthScreen({ navigation }) {
     }
   }
 
-  async function handleSpotifyCallback(code) {
+ async function handleSpotifyCallback(code) {
+    // Evitar doble envío
+    if (processingCode) {
+      console.log('Ya se está procesando un código, ignorando...');
+      return;
+    }
+    
     try {
+      setProcessingCode(true); // NUEVO
       setLoading(true);
       console.log('Enviando código al backend...');
       
@@ -139,9 +147,13 @@ export default function SpotifyAuthScreen({ navigation }) {
       }
     } catch (err) {
       console.error('Error en callback:', err);
-      Alert.alert('Error', 'No se pudo completar la conexión con Spotify');
+      // Solo mostrar error si no es por código ya usado
+      if (!err.message?.includes('invalid_grant')) {
+        Alert.alert('Error', 'No se pudo completar la conexión con Spotify');
+      }
     } finally {
       setLoading(false);
+      // No resetear processingCode para evitar reintentos
     }
   }
 
