@@ -10,16 +10,17 @@ import {
   Linking,
   TextInput,
   Keyboard,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/client';
 import { rutinaStyles } from '../styles/rutinaStyles';
 
 const QUICK_MOODS = [
-  { key: 'intense', label: '🔥 Intenso' },
-  { key: 'energetic', label: '⚡ Energético' },
-  { key: 'focused', label: '🎯 Enfocado' },
-  { key: 'calm', label: '🧘 Calmado' },
+  { key: 'intense', label: '🔥 Intenso', query: 'música intensa para entrenar pesado' },
+  { key: 'energetic', label: '⚡ Energético', query: 'música energética y motivadora' },
+  { key: 'focused', label: '🎯 Enfocado', query: 'música electrónica para concentrarse' },
+  { key: 'calm', label: '🧘 Calmado', query: 'música tranquila para estiramientos' },
 ];
 
 export default function RutinaScreen({
@@ -32,13 +33,18 @@ export default function RutinaScreen({
   const [loadingAI, setLoadingAI] = useState(false);
   const [localRoutine, setLocalRoutine] = useState(activeRoutine);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [spotifyPlaylists, setSpotifyPlaylists] = useState([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   
   // Estados para el chat de música
   const [musicQuery, setMusicQuery] = useState('');
   const [aiMessage, setAiMessage] = useState('');
   const [showMusicInput, setShowMusicInput] = useState(false);
+  
+  // Estados para tracks generados
+  const [generatedTracks, setGeneratedTracks] = useState([]);
+  const [trackUris, setTrackUris] = useState([]);
+  const [playlistName, setPlaylistName] = useState('');
+  const [savingPlaylist, setSavingPlaylist] = useState(false);
 
   useEffect(() => {
     setLocalRoutine(activeRoutine);
@@ -52,54 +58,38 @@ export default function RutinaScreen({
     try {
       const res = await api.get('/api/spotify/status');
       setSpotifyConnected(res.data.connected);
-      if (res.data.connected) {
-        loadSpotifyPlaylists('intense');
-      }
     } catch (err) {
       setSpotifyConnected(false);
     }
   }
 
-  async function loadSpotifyPlaylists(mood) {
-    try {
-      setLoadingPlaylists(true);
-      setAiMessage('');
-      const res = await api.get(`/api/spotify/playlists?mood=${mood}`);
-      if (res.data.playlists?.length > 0) {
-        setSpotifyPlaylists(res.data.playlists.slice(0, 6));
-      }
-    } catch (err) {
-      console.log('Error cargando playlists');
-      setSpotifyPlaylists([]);
-    } finally {
-      setLoadingPlaylists(false);
-    }
-  }
-
-  async function handleMusicSearch() {
-    if (!musicQuery.trim()) return;
+  async function handleMusicSearch(query) {
+    const searchQuery = query || musicQuery.trim();
+    if (!searchQuery) return;
     
     Keyboard.dismiss();
     setLoadingPlaylists(true);
-    setAiMessage('Buscando...');
+    setAiMessage('Analizando tus gustos...');
+    setGeneratedTracks([]);
     
     try {
       const res = await api.post('/api/spotify/music-chat', { 
-        message: musicQuery.trim() 
+        message: searchQuery 
       });
       
       if (res.data.needsConnection) {
         setAiMessage(res.data.aiMessage);
-        setSpotifyPlaylists([]);
         return;
       }
       
       setAiMessage(res.data.aiMessage || '');
+      setPlaylistName(res.data.playlistName || 'Mi Mix');
       
-      if (res.data.playlists?.length > 0) {
-        setSpotifyPlaylists(res.data.playlists);
+      if (res.data.tracks?.length > 0) {
+        setGeneratedTracks(res.data.tracks);
+        setTrackUris(res.data.trackUris || []);
       } else {
-        setAiMessage('No encontré playlists para eso. Intenta con otra descripción.');
+        setAiMessage('No encontré canciones para eso. Intenta con otra descripción.');
       }
     } catch (err) {
       console.error('Error en búsqueda:', err);
@@ -110,10 +100,42 @@ export default function RutinaScreen({
     }
   }
 
-  async function handleQuickMood(mood) {
-    setShowMusicInput(false);
-    setAiMessage('');
-    await loadSpotifyPlaylists(mood);
+  async function handleSavePlaylist() {
+    if (trackUris.length === 0) return;
+    
+    setSavingPlaylist(true);
+    
+    try {
+      const res = await api.post('/api/spotify/save-playlist', {
+        name: playlistName,
+        trackUris: trackUris,
+      });
+      
+      if (res.data.success) {
+        Alert.alert(
+          '¡Playlist guardada! 🎉',
+          res.data.message,
+          [
+            { text: 'OK' },
+            { 
+              text: 'Abrir en Spotify', 
+              onPress: () => Linking.openURL(res.data.playlist.external_url)
+            }
+          ]
+        );
+      }
+    } catch (err) {
+      console.error('Error guardando playlist:', err);
+      Alert.alert('Error', 'No se pudo guardar la playlist');
+    } finally {
+      setSavingPlaylist(false);
+    }
+  }
+
+  function formatDuration(ms) {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
   async function handleGenerateAI() {
@@ -232,7 +254,7 @@ export default function RutinaScreen({
               {QUICK_MOODS.map((mood) => (
                 <TouchableOpacity
                   key={mood.key}
-                  onPress={() => handleQuickMood(mood.key)}
+                  onPress={() => handleMusicSearch(mood.query)}
                   style={{
                     backgroundColor: '#1a1a1a',
                     paddingVertical: 8,
@@ -248,7 +270,6 @@ export default function RutinaScreen({
                 </TouchableOpacity>
               ))}
               
-              {/* Botón para abrir input personalizado */}
               <TouchableOpacity
                 onPress={() => setShowMusicInput(!showMusicInput)}
                 style={{
@@ -299,11 +320,11 @@ export default function RutinaScreen({
                     placeholderTextColor="#666666"
                     value={musicQuery}
                     onChangeText={setMusicQuery}
-                    onSubmitEditing={handleMusicSearch}
+                    onSubmitEditing={() => handleMusicSearch()}
                     returnKeyType="search"
                   />
                   <TouchableOpacity
-                    onPress={handleMusicSearch}
+                    onPress={() => handleMusicSearch()}
                     disabled={loadingPlaylists || !musicQuery.trim()}
                     style={{
                       backgroundColor: musicQuery.trim() ? '#1DB954' : '#333333',
@@ -322,14 +343,11 @@ export default function RutinaScreen({
                   </TouchableOpacity>
                 </View>
                 
-                {/* Sugerencias rápidas */}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
                   {['Rock clásico', 'Hip hop', 'Electrónica', 'Metal', 'Reggaeton'].map((sug) => (
                     <TouchableOpacity
                       key={sug}
-                      onPress={() => {
-                        setMusicQuery(sug);
-                      }}
+                      onPress={() => setMusicQuery(sug)}
                       style={{
                         backgroundColor: '#262626',
                         paddingVertical: 6,
@@ -361,63 +379,140 @@ export default function RutinaScreen({
               </View>
             ) : null}
 
-            {/* Playlists */}
+            {/* Loading */}
             {loadingPlaylists ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator color="#1DB954" />
                 <Text style={{ color: '#666666', fontSize: 12, marginTop: 8 }}>
-                  Buscando playlists...
+                  Generando tu playlist personalizada...
                 </Text>
               </View>
-            ) : spotifyPlaylists.length > 0 ? (
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 10 }}
-              >
-                {spotifyPlaylists.map((playlist, idx) => (
+            ) : generatedTracks.length > 0 ? (
+              /* Tracks generados */
+              <View>
+                {/* Header de la playlist con botón guardar */}
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}>
+                  <View>
+                    <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700' }}>
+                      {playlistName}
+                    </Text>
+                    <Text style={{ color: '#888888', fontSize: 12 }}>
+                      {generatedTracks.length} canciones personalizadas
+                    </Text>
+                  </View>
                   <TouchableOpacity
-                    key={playlist.id || idx}
+                    onPress={handleSavePlaylist}
+                    disabled={savingPlaylist}
                     style={{
-                      backgroundColor: '#ffffff',
-                      padding: 14,
-                      borderRadius: 14,
-                      width: 160,
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 12,
-                      elevation: 4,
-                    }}
-                    onPress={() => Linking.openURL(playlist.external_url)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={{
                       backgroundColor: '#1DB954',
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
+                      paddingVertical: 8,
+                      paddingHorizontal: 16,
+                      borderRadius: 20,
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: 8,
-                    }}>
-                      <Text style={{ fontSize: 14, color: '#ffffff' }}>▶</Text>
-                    </View>
-                    <Text style={{ 
-                      color: '#000000', 
-                      fontSize: 13, 
-                      fontWeight: '700', 
-                      marginBottom: 4,
-                      lineHeight: 16,
-                    }} numberOfLines={2}>
-                      {playlist.name}
-                    </Text>
-                    <Text style={{ color: '#888888', fontSize: 11, fontWeight: '600' }}>
-                      {playlist.tracks_total} canciones
-                    </Text>
+                      gap: 6,
+                    }}
+                  >
+                    {savingPlaylist ? (
+                      <ActivityIndicator color="#000000" size="small" />
+                    ) : (
+                      <>
+                        <Text style={{ fontSize: 14 }}>💾</Text>
+                        <Text style={{ color: '#000000', fontSize: 13, fontWeight: '700' }}>
+                          Guardar
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                </View>
+
+                {/* Lista de tracks */}
+                <View style={{
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                }}>
+                  {generatedTracks.slice(0, 8).map((track, idx) => (
+                    <TouchableOpacity
+                      key={track.id}
+                      onPress={() => Linking.openURL(track.external_url)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 12,
+                        borderBottomWidth: idx < generatedTracks.length - 1 && idx < 7 ? 1 : 0,
+                        borderBottomColor: '#333333',
+                      }}
+                    >
+                      {track.image ? (
+                        <Image
+                          source={{ uri: track.image }}
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 4,
+                            marginRight: 12,
+                          }}
+                        />
+                      ) : (
+                        <View style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 4,
+                          backgroundColor: '#333333',
+                          marginRight: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Text style={{ fontSize: 20 }}>🎵</Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                          {track.name}
+                        </Text>
+                        <Text style={{ color: '#888888', fontSize: 12 }} numberOfLines={1}>
+                          {track.artist}
+                        </Text>
+                      </View>
+                      <Text style={{ color: '#666666', fontSize: 11 }}>
+                        {formatDuration(track.duration_ms)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {generatedTracks.length > 8 && (
+                    <View style={{ padding: 12, alignItems: 'center' }}>
+                      <Text style={{ color: '#888888', fontSize: 12 }}>
+                        +{generatedTracks.length - 8} canciones más
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Botón para nueva búsqueda */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setGeneratedTracks([]);
+                    setAiMessage('');
+                    setShowMusicInput(true);
+                  }}
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#1DB954', fontSize: 13, fontWeight: '600' }}>
+                    🔄 Generar otra playlist
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
           </View>
         ) : (
@@ -432,21 +527,11 @@ export default function RutinaScreen({
               alignItems: 'center',
               justifyContent: 'space-between',
               marginBottom: 16,
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 8,
-              elevation: 2,
             }}
             onPress={() => navigation.navigate('SpotifyAuth')}
           >
             <View style={{ flex: 1 }}>
-              <Text style={{ 
-                color: '#000000', 
-                fontSize: 14, 
-                fontWeight: '700',
-                marginBottom: 2,
-              }}>
+              <Text style={{ color: '#000000', fontSize: 14, fontWeight: '700', marginBottom: 2 }}>
                 Conectar Spotify
               </Text>
               <Text style={{ color: '#666666', fontSize: 12, fontWeight: '600' }}>
