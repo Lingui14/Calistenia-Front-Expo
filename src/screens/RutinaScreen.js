@@ -45,6 +45,7 @@ export default function RutinaScreen({
   const [trackUris, setTrackUris] = useState([]);
   const [playlistName, setPlaylistName] = useState('');
   const [savingPlaylist, setSavingPlaylist] = useState(false);
+  const [showAllTracks, setShowAllTracks] = useState(false);
 
   useEffect(() => {
     setLocalRoutine(activeRoutine);
@@ -71,6 +72,7 @@ export default function RutinaScreen({
     setLoadingPlaylists(true);
     setAiMessage('Analizando tus gustos...');
     setGeneratedTracks([]);
+    setShowAllTracks(false);
     
     try {
       const res = await api.post('/api/spotify/music-chat', { 
@@ -431,13 +433,13 @@ export default function RutinaScreen({
                   </TouchableOpacity>
                 </View>
 
-                {/* Lista de tracks */}
+                {/* Lista de tracks - COLAPSABLE */}
                 <View style={{
                   backgroundColor: '#1a1a1a',
                   borderRadius: 16,
                   overflow: 'hidden',
                 }}>
-                  {generatedTracks.slice(0, 8).map((track, idx) => (
+                  {(showAllTracks ? generatedTracks : generatedTracks.slice(0, 6)).map((track, idx, arr) => (
                     <TouchableOpacity
                       key={track.id}
                       onPress={() => Linking.openURL(track.external_url)}
@@ -445,7 +447,7 @@ export default function RutinaScreen({
                         flexDirection: 'row',
                         alignItems: 'center',
                         padding: 12,
-                        borderBottomWidth: idx < generatedTracks.length - 1 && idx < 7 ? 1 : 0,
+                        borderBottomWidth: idx < arr.length - 1 ? 1 : 0,
                         borderBottomColor: '#333333',
                       }}
                     >
@@ -486,14 +488,69 @@ export default function RutinaScreen({
                     </TouchableOpacity>
                   ))}
                   
-                  {generatedTracks.length > 8 && (
-                    <View style={{ padding: 12, alignItems: 'center' }}>
-                      <Text style={{ color: '#888888', fontSize: 12 }}>
-                        +{generatedTracks.length - 8} canciones más
+                  {/* Botón Ver más / Ver menos */}
+                  {generatedTracks.length > 6 && (
+                    <TouchableOpacity
+                      onPress={() => setShowAllTracks(!showAllTracks)}
+                      style={{
+                        padding: 14,
+                        alignItems: 'center',
+                        borderTopWidth: 1,
+                        borderTopColor: '#333333',
+                      }}
+                    >
+                      <Text style={{ color: '#1DB954', fontSize: 13, fontWeight: '600' }}>
+                        {showAllTracks 
+                          ? '▲ Ver menos' 
+                          : `▼ Ver todas (${generatedTracks.length - 6} más)`
+                        }
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                   )}
                 </View>
+
+                {/* Botón Play All */}
+                <TouchableOpacity
+                  onPress={async () => {
+                    setSavingPlaylist(true);
+                    try {
+                      const res = await api.post('/api/spotify/save-playlist', {
+                        name: playlistName,
+                        trackUris: trackUris,
+                      });
+                      
+                      if (res.data.success) {
+                        Linking.openURL(res.data.playlist.external_url);
+                      }
+                    } catch (err) {
+                      Alert.alert('Error', 'No se pudo crear la playlist');
+                    } finally {
+                      setSavingPlaylist(false);
+                    }
+                  }}
+                  disabled={savingPlaylist}
+                  style={{
+                    backgroundColor: '#1DB954',
+                    paddingVertical: 14,
+                    borderRadius: 30,
+                    marginTop: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {savingPlaylist ? (
+                    <ActivityIndicator color="#000000" size="small" />
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 18 }}>▶️</Text>
+                      <Text style={{ color: '#000000', fontSize: 15, fontWeight: '700' }}>
+                        Reproducir en Spotify
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
                 {/* Botón para nueva búsqueda */}
                 <TouchableOpacity
@@ -501,6 +558,7 @@ export default function RutinaScreen({
                     setGeneratedTracks([]);
                     setAiMessage('');
                     setShowMusicInput(true);
+                    setShowAllTracks(false);
                   }}
                   style={{
                     marginTop: 12,
